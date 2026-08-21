@@ -1,0 +1,353 @@
+/* API Key Manager - Minimal Design */
+
+.key-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 8px;
+  transition: all var(--transition-normal);
+}
+
+.key-item:hover {
+  border-color: var(--primary);
+  background: var(--bg-card-hover);
+}
+
+.key-item.active {
+  border-color: var(--primary);
+  background: var(--gradient-soft);
+}
+
+.key-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.key-item-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.key-item-badge {
+  background: var(--primary);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.key-item-value {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.key-item-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.key-item-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.key-item-actions button {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.7rem;
+  transition: all var(--transition-normal);
+}
+
+.key-item-actions button:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.key-item-actions button.danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.provider-section {
+  margin-bottom: 16px;
+}
+
+.provider-section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.empty-keys {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.empty-keys-icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+/* دکمه Manage با Badge */
+.km-manage-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: all var(--transition-normal);
+  position: relative;
+}
+
+.km-manage-btn:hover {
+  background: var(--gradient-soft);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.km-icon {
+  font-size: 1.1rem;
+}
+
+.km-text {
+  flex: 1;
+  text-align: left;
+  font-weight: 500;
+}
+
+.km-badge {
+  background: var(--primary);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+  transition: all var(--transition-normal);
+}
+
+.km-badge.has-keys {
+  background: var(--success);
+  animation: pulse 2s infinite;
+}
+
+.km-badge.no-keys {
+  background: var(--text-muted);
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Status Summary */
+.km-status-summary {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+.km-status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.km-status-icon {
+  font-size: 0.9rem;
+}
+
+.km-status-text {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Provider Dropdown با Status */
+.provider-status-icon {
+  margin-left: 4px;
+  font-size: 0.8rem;
+}
+
+.provider-status-icon.ready {
+  color: var(--success);
+}
+
+.provider-status-icon.missing {
+  color: var(--text-muted);
+}
+
+/* Tooltip */
+.km-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(26, 26, 46, 0.98);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  min-width: 250px;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--transition-normal);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.km-manage-btn:hover .km-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.km-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(26, 26, 46, 0.98);
+}
+
+.km-tooltip-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.km-tooltip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.km-tooltip-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  padding: 4px 0;
+}
+
+.km-tooltip-item-name {
+  color: var(--text-secondary);
+}
+
+.km-tooltip-item-status {
+  font-weight: 600;
+}
+
+.km-tooltip-item-status.ready {
+  color: var(--success);
+}
+
+.km-tooltip-item-status.missing {
+  color: var(--text-muted);
+}
+
+.km-tooltip-hint {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ============ Modal Overlay Fix ============ */
+
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(4px);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10000 !important;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--bg-sidebar) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  max-width: 90vw !important;
+  max-height: 90vh !important;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: slideIn var(--transition-slow) cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+}
+
+/* ✅ اطمینان از نمایش دکمه‌ها */
+.modal-actions {
+  display: flex !important;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.modal-actions button {
+  min-width: 100px;
+}
+
+/* ✅ Responsive */
+@media (max-width: 600px) {
+  .modal {
+    max-width: 95vw !important;
+    padding: var(--space-lg);
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .modal-actions button {
+    width: 100%;
+    min-width: auto;
+  }
+}

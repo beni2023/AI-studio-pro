@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="purple">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Studio Pro</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- CSS Modular -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dropdown.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/keymanager.css') }}">
+</head>
+<body>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="resize-handle" id="resizeHandle"></div>
+  <h2 class="brand-title">✨ AI Studio Pro</h2>
+  
+  <!-- Chat History -->
+  <section class="sidebar-section">
+    <h3 class="section-title">💬 Chat History</h3>
+    <button class="btn btn-primary btn-full" id="newChatBtn">✨ New Chat</button>
+    <div class="chat-history-list" id="chatHistoryList"></div>
+    <button class="btn btn-danger btn-full" id="clearAllChatsBtn">🗑️ Clear All History</button>
+  </section>
+  
+  <!-- Search -->
+  <section class="sidebar-section">
+    <h3 class="section-title">🔍 Search</h3>
+    <div class="search-box">
+      <input type="text" class="search-input" id="searchInput" placeholder="Search messages...">
+      <button class="search-clear" id="searchClearBtn">✕</button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+  </section>
+  
+  <!-- Provider & Model -->
+<section class="sidebar-section">
+  <h3 class="section-title">🤖 Provider & Model</h3>
+  <label class="form-label">Provider</label>
+  <select class="form-select" id="provider">
+    <option value="">No Providers - Add one first</option>
+  </select>
+  <label class="form-label">Model</label>
+  <div style="display:flex; gap:4px;">
+    <select class="form-select" id="model" style="flex:1;"></select>
+    <button class="btn" id="refreshModelsBtn" title="Refresh models" style="padding:8px;">🔄</button>
+  </div>
+  
+  <!-- Provider Status Card -->
+  <div class="provider-card" id="providerStatusCard" style="margin-top:12px; display:none;">
+    <div class="provider-card-header">
+      <div class="provider-card-name">
+        <span id="providerStatusIcon">🔑</span>
+        <span id="providerStatusName">Provider</span>
+      </div>
+      <div class="provider-card-status">
+        <div class="status-dot" id="providerStatusDot"></div>
+        <span id="providerStatusText" style="font-size:0.7rem;">Unknown</span>
+      </div>
+    </div>
+    <div class="provider-card-info">
+      <div class="provider-card-info-item">
+        <span>🔑</span>
+        <span id="providerKeyCount">0 keys</span>
+      </div>
+      <div class="provider-card-info-item">
+        <span>🤖</span>
+        <span id="providerModelCount">0 models</span>
+      </div>
+    </div>
+  </div>
+</section>
+  
+  <!-- API Key Manager -->
+  <section class="sidebar-section">
+    <h3 class="section-title">🔑 API Keys</h3>
+    
+    <!-- Hidden field for active key -->
+    <input type="hidden" id="apiKey" value="">
+    
+    <!-- Manage Button -->
+    <button class="btn btn-full km-manage-btn" id="openKeyManagerBtn">
+      <span class="km-icon">🔑</span>
+      <span class="km-text">Manage API Keys</span>
+      <span class="km-badge" id="kmBadge">0</span>
+    </button>
+    
+    <!-- Status Summary -->
+    <div class="km-status-summary" id="kmStatusSummary">
+      <div class="km-status-item">
+        <span class="km-status-icon">✅</span>
+        <span class="km-status-text" id="kmReadyCount">0 ready</span>
+      </div>
+      <div class="km-status-item">
+        <span class="km-status-icon">⚠️</span>
+        <span class="km-status-text" id="kmMissingCount">0 missing</span>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Theme -->
+  <section class="sidebar-section">
+    <h3 class="section-title">🎨 Theme</h3>
+    <div class="theme-selector">
+      <button class="theme-dot purple active" data-theme="purple"></button>
+      <button class="theme-dot blue" data-theme="blue"></button>
+      <button class="theme-dot green" data-theme="green"></button>
+      <button class="theme-dot orange" data-theme="orange"></button>
+    </div>
+  </section>
+  
+  <!-- File Analysis -->
+  <section class="sidebar-section">
+    <h3 class="section-title">📄 File Analysis</h3>
+    <div class="file-upload-area" id="fileUploadArea">📁 Click to upload PDF/Word/TXT</div>
+    <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt" hidden>
+    <div class="file-info-box" id="fileInfoBox" hidden>
+      <div id="fileInfoText"></div>
+    </div>
+  </section>
+  
+  <!-- Actions -->
+  <section class="sidebar-section">
+    <button class="btn btn-full" id="exportChatBtn">📤 Export Chat</button>
+    <button class="btn btn-danger btn-full" id="clearChatBtn">🗑️ Clear Current Chat</button>
+    <button class="btn btn-full" id="commandPaletteBtn">⌨️ Command Palette (Ctrl+K)</button>
+  </section>
+</aside>
+
+<!-- ============ MAIN CONTENT ============ -->
+<main class="main">
+  <header class="chat-header">
+    <h1 class="chat-title">💬 AI Chat</h1>
+    <div class="chat-header-controls">
+      <span class="badge" id="modelInfo">No model</span>
+      <span class="badge" id="msgCount">0 msgs</span>
+      <span class="badge" id="chatTitle">Untitled</span>
+      <button class="btn btn-outline" id="selectBtn">☑️ Select</button>
+      <div class="dropdown">
+        <button class="btn btn-outline" id="copyAllBtn">📋 Copy All ▾</button>
+        <div class="dropdown-menu" id="copyMenu" hidden>
+          <button class="dropdown-item" data-format="plain">📄 Plain Text</button>
+          <button class="dropdown-item" data-format="md">📝 Markdown</button>
+          <button class="dropdown-item" data-format="html">🌐 Rich Text</button>
+          <button class="dropdown-item" data-format="json">📋 JSON</button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="messages" id="messages"></div>
+</main>
+
+<!-- ============ INPUT AREA ============ -->
+<footer class="input-area" id="inputArea">
+  <div class="input-row">
+    <div class="input-wrapper-professional">
+      <div class="input-container">
+        <textarea id="prompt" placeholder="Type a message... (Enter to send, Shift+Enter for new line)"></textarea>
+      </div>
+      
+      <!-- Input Footer - نمایش اطلاعات -->
+      <div class="input-footer">
+        <div class="input-footer-left">
+          <div class="input-info-item">
+            <span class="input-info-icon">🤖</span>
+            <span class="input-info-text" id="activeModelDisplay">No model</span>
+          </div>
+          <div class="input-info-item">
+            <span class="input-info-icon">🌐</span>
+            <span class="input-info-text" id="activeProviderDisplay">No provider</span>
+          </div>
+        </div>
+        <div class="input-footer-right">
+          <div class="input-info-item">
+            <span class="input-info-icon">📝</span>
+            <span class="token-counter" id="tokenCounter">0 tokens</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="image-preview-container" id="imagePreviewContainer" hidden></div>
+    </div>
+    
+    <div class="input-actions">
+      <button class="btn btn-icon" id="attachBtn" title="Attach image">📎</button>
+      <input type="file" id="imageInput" accept="image/*" hidden>
+      <button class="btn btn-send" id="sendBtn">➤</button>
+    </div>
+  </div>
+</footer>
+
+<!-- ============ OVERLAYS ============ -->
+
+<!-- Drag & Drop Overlay -->
+<div class="drag-overlay" id="dragOverlay" hidden>
+  <div class="drag-overlay-content">
+    <h3>📸 Drop image here</h3>
+    <p>Release to attach your image</p>
+  </div>
+</div>
+
+<!-- Copy Selected FAB -->
+<button class="copy-fab" id="copyFab" hidden>📋 Copy Selected (<span id="selectedCount">0</span>)</button>
+
+<!-- ============ MODALS ============ -->
+
+<!-- Add Key Modal -->
+<div class="modal-overlay" id="addKeyModal" hidden>
+  <div class="modal" style="max-width:500px; width:100%;">
+    <h3 class="modal-title">🔑 Add New API Key</h3>
+    
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div>
+        <label class="form-label">Provider</label>
+        <select class="form-select" id="akProvider"></select>
+      </div>
+      
+      <div>
+        <label class="form-label">Key Name</label>
+        <input type="text" class="form-input" id="akName" placeholder="e.g., Main Key">
+      </div>
+      
+      <div>
+        <label class="form-label">API Key</label>
+        <input type="password" class="form-input" id="akApiKey" placeholder="sk-... or your-api-key">
+      </div>
+      
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="akDefault">
+        <span>Set as default key</span>
+      </label>
+      
+      <div class="modal-actions">
+        <button class="btn" id="akCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="akSaveBtn">💾 Save Key</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Copy Preview Modal -->
+<div class="modal-overlay" id="copyModal" hidden>
+  <div class="modal">
+    <h3 class="modal-title" id="modalTitle">Copy Preview</h3>
+    <textarea class="modal-textarea" id="modalContent" readonly></textarea>
+    <div class="modal-actions">
+      <button class="btn" id="closeModalBtn">Close</button>
+      <button class="btn btn-primary" id="copyFromModalBtn">📋 Copy to Clipboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- Key Manager Modal -->
+<div class="modal-overlay" id="keyManagerModal" hidden>
+  <div class="modal" style="max-width:600px; max-height:85vh;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <h3 class="modal-title" style="margin:0;">🔑 API Keys Manager</h3>
+      <button class="btn" id="closeKeyManagerBtn" style="padding:4px 8px;">✕</button>
+    </div>
+    
+    <!-- Toolbar -->
+    <div style="display:flex; gap:8px; margin-bottom:16px;">
+      <button class="btn btn-primary" id="kmAddProviderBtn" style="flex:1;">➕ Add Provider</button>
+      <button class="btn" id="kmAddKeyBtn" style="flex:1;">🔑 Add Key</button>
+    </div>
+    
+    <!-- Keys List -->
+    <div id="kmKeysList" style="max-height:400px; overflow-y:auto;">
+      <div class="empty-keys">
+        <div class="empty-keys-icon">🔑</div>
+        <div>Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+label">Base URL</label>
+        <input type="text" class="form-input" id="apBaseUrl" placeholder="https://api.openmodel.ai">
+      </div>
+      
+      <!-- ✅ Endpoints (قابل ویرایش) -->
+      <details style="margin-top:8px;">
+        <summary style="cursor:pointer; font-size:0.85rem; color:var(--text-secondary);">
+          ⚙️ Advanced: Custom<!-- Add Provider Modal -->
+<div class="modal-overlay" id="addProviderModal" hidden>
+  <div class="modal" style="max-width:550px; width:100%;">
+    <h3 class="modal-title">➕ Add New Provider</h3>
+    
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      
+      <!-- Preset Selector -->
+      <div>
+        <label class="form-label">Quick Setup (Preset)</label>
+        <select class="form-select" id="apPreset">
+          <option value="">-- Custom Provider --</option>
+          <option value="openrouter">🌐 OpenRouter</option>
+          <option value="openmodel">🤖 OpenModel (Responses API)</option>
+          <option value="anthropic">🎭 Anthropic (Claude)</option>
+          <option value="gemini">💎 Google Gemini</option>
+          <option value="openai">🧠 OpenAI</option>
+        </select>
+        <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">
+          💡 Select a preset to auto-fill settings
+        </div>
+      </div>
+      
+      <div>
+        <label class="form-label">Provider ID</label>
+        <input type="text" class="form-input" id="apId" placeholder="e.g., openmodel">
+      </div>
+      
+      <div>
+        <label class="form-label">Provider Name</label>
+        <input type="text" class="form-input" id="apName" placeholder="e.g., OpenModel">
+      </div>
+      
+      <div>
+        <label class="form-label">Icon (emoji)</label>
+        <input type="text" class="form-input" id="apIcon" placeholder="🤖" maxlength="2">
+      </div>
+      
+      <!-- Protocol Selector -->
+      <div>
+        <label class="form-label">Protocol</label>
+        <select class="form-select" id="apProtocol">
+          <option value="chat_completions">OpenAI Chat (/v1/chat/completions)</option>
+          <option value="responses">OpenAI Responses (/v1/responses)</option>
+          <option value="messages">Anthropic Messages (/v1/messages)</option>
+          <option value="gemini">Google Gemini</option>
+        </select>
+      </div>
+      
+      <div>
+        <label class="form-label">Base URL</label>
+        <input type="text" class="form-input" id="apBaseUrl" placeholder="https://api.openmodel.ai">
+      </div>
+      
+      <!-- Advanced Endpoints -->
+      <details style="margin-top:8px;">
+        <summary style="cursor:pointer; font-size:0.85rem; color:var(--text-secondary);">
+          ⚙️ Advanced: Custom Endpoints
+        </summary>
+        <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px; padding:12px; background:var(--bg-input); border-radius:var(--radius-md);">
+          <div>
+            <label class="form-label">Models Endpoint</label>
+            <input type="text" class="form-input" id="apModelsEndpoint" placeholder="/v1/models">
+          </div>
+          <div>
+            <label class="form-label">Chat Endpoint</label>
+            <input type="text" class="form-input" id="apChatEndpoint" placeholder="/v1/responses">
+          </div>
+        </div>
+      </details>
+      
+      <div class="modal-actions">
+        <button class="btn" id="apCancelBtn" style="flex:1;">Cancel</button>
+        <button class="btn btn-primary" id="apSaveBtn" style="flex:1;">💾 Save Provider</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Command Palette -->
+<div class="command-palette-overlay" id="commandPalette" hidden>
+  <div class="command-palette">
+    <input type="text" class="command-input" id="commandInput" placeholder="Type a command or search...">
+    <div class="command-list" id="commandList"></div>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div class="context-menu" id="contextMenu" hidden></div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ============ JAVASCRIPT ============ -->
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Flask
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-Limiter==3.5.0
+
+# HTTP
+requests==2.31.0
+urllib3==2.1.0
+
+# Environment
+python-dotenv==1.0.0
+
+# Utils
+Werkzeug==3.0.1
+
+# Security
+cryptography==41.0.7
