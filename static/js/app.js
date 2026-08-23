@@ -176,7 +176,9 @@ const ui = {
       }
       const checkbox = `<input type="checkbox" class="msg-cb" ${isChecked} data-idx="${i}">`;
       let actions = '';
-      if (!isUser && m.content && !m.streaming) { actions = `<div class="msg-actions"><button class="msg-action" data-action="copy-msg" data-idx="${i}">📋 Copy</button></div>`; }
+      if (!isUser && m.content && !m.streaming) { 
+        actions = `<div class="msg-actions"><button class="msg-action" data-action="copy-msg" data-idx="${i}">📋 Copy</button><button class="msg-action" data-action="regen-msg" data-idx="${i}" title="Regenerate response">🔄</button></div>`; 
+      }
       let longMsgClass = ''; let toggleBtn = '';
       if (!isUser && m.content && m.content.length > 1200 && !m.streaming) { longMsgClass = 'long-msg'; toggleBtn = `<button class="toggle-long-btn" data-action="toggle-long">Show more ▼</button>`; }
       return `<div class="msg ${isUser ? 'user' : ''} ${state.selectedIndices.has(i) ? 'selected-msg' : ''}" data-idx="${i}">${checkbox}<div class="avatar">${isUser ? '👤' : '🤖'}</div><div class="bubble ${longMsgClass}">${imageHtml}${contentHtml}${actions}${toggleBtn}</div></div>`;
@@ -364,11 +366,11 @@ const keyManager = {
 // ============ Chat ============
 
 const chat = {
-  async sendMessage(textOverride = null) {
+  async sendMessage(textOverride = null, imageOverride = null) {
     if (state.isStreaming) { ui.showToast('Please wait', 'warning'); return; }
     const input = document.getElementById('prompt');
     const text = textOverride !== null ? textOverride : input.value.trim();
-    if (!text && !state.currentImage) { ui.showToast('Enter a message', 'warning'); return; }
+    if (!text && !state.currentImage && !imageOverride) { ui.showToast('Enter a message', 'warning'); return; }
     
     const provider = providerManager.getCurrentProvider();
     if (!provider) { ui.showToast('No provider selected', 'warning'); return; }
@@ -378,11 +380,12 @@ const chat = {
     const model = document.getElementById('model').value;
     if (!model) { ui.showToast('Select a model', 'warning'); return; }
     
-    const messageObj = { role: 'user', content: text || (state.currentImage ? '[Image]' : ''), timestamp: Date.now() };
-    if (state.currentImage) messageObj.image = state.currentImage;
+    const messageObj = { role: 'user', content: text || (imageOverride || state.currentImage ? '[Image]' : ''), timestamp: Date.now() };
+    if (imageOverride) messageObj.image = imageOverride;
+    else if (state.currentImage) messageObj.image = state.currentImage;
     state.chatHistory.push(messageObj);
-    if (textOverride === null) { input.value = ''; input.style.height = 'auto'; input.classList.remove('rtl'); }
-    if (state.currentImage) this.removeImagePreview();
+    if (textOverride === null && !imageOverride) { input.value = ''; input.style.height = 'auto'; input.classList.remove('rtl'); }
+    if (state.currentImage && !imageOverride) this.removeImagePreview();
     if (state.chatHistory.length === 1) ui.updateChatTitle(utils.truncate(text || 'Image'));
     state.lastReq = { provider: provider.id, model };
     state.assistantIndex = state.chatHistory.length;
@@ -904,7 +907,7 @@ function initEventListeners() {
 
 // توابع حذف شده - Key Manager کاملاً حذف شد
 
-function handleMessageClick(e) { const target = e.target; if (target.classList.contains('chip')) { const text = target.dataset.chip; const prompt = document.getElementById('prompt'); prompt.value = text; utils.checkRTL(prompt); prompt.focus(); return; } if (target.classList.contains('msg-cb')) { const idx = parseInt(target.dataset.idx); if (target.checked) state.selectedIndices.add(idx); else state.selectedIndices.delete(idx); updateSelectUI(); return; } const action = target.dataset.action; const idx = parseInt(target.dataset.idx); if (action === 'copy-msg') { const msg = state.chatHistory[idx]; utils.copyToClipboard(msg.content).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Copy failed', 'error')); } else if (action === 'toggle-long') { const bubble = target.closest('.bubble'); bubble.classList.toggle('expanded'); target.textContent = bubble.classList.contains('expanded') ? 'Show less ▲' : 'Show more ▼'; } else if (action === 'download-image') { const msg = state.chatHistory[idx]; const link = document.createElement('a'); link.href = msg.image; link.download = `image-${idx}.png`; link.click(); ui.showToast('Downloaded', 'success'); } else if (action === 'copy-image') { const msg = state.chatHistory[idx]; fetch(msg.image).then(res => res.blob()).then(blob => navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Failed', 'error')); } else if (action === 'open-image') { window.open(target.src, '_blank'); } }
+function handleMessageClick(e) { const target = e.target; if (target.classList.contains('chip')) { const text = target.dataset.chip; const prompt = document.getElementById('prompt'); prompt.value = text; utils.checkRTL(prompt); prompt.focus(); return; } if (target.classList.contains('msg-cb')) { const idx = parseInt(target.dataset.idx); if (target.checked) state.selectedIndices.add(idx); else state.selectedIndices.delete(idx); updateSelectUI(); return; } const action = target.dataset.action; const idx = parseInt(target.dataset.idx); if (action === 'copy-msg') { const msg = state.chatHistory[idx]; utils.copyToClipboard(msg.content).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Copy failed', 'error')); } else if (action === 'regen-msg') { regenMessage(idx); } else if (action === 'toggle-long') { const bubble = target.closest('.bubble'); bubble.classList.toggle('expanded'); target.textContent = bubble.classList.contains('expanded') ? 'Show less ▲' : 'Show more ▼'; } else if (action === 'download-image') { const msg = state.chatHistory[idx]; const link = document.createElement('a'); link.href = msg.image; link.download = `image-${idx}.png`; link.click(); ui.showToast('Downloaded', 'success'); } else if (action === 'copy-image') { const msg = state.chatHistory[idx]; fetch(msg.image).then(res => res.blob()).then(blob => navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Failed', 'error')); } else if (action === 'open-image') { window.open(target.src, '_blank'); } }
 function handleContextMenu(e) { const msg = e.target.closest('.msg'); if (!msg) return; e.preventDefault(); const idx = parseInt(msg.dataset.idx); const message = state.chatHistory[idx]; const items = [{ icon: '📋', label: 'Copy', action: `copy-msg-${idx}` }, { icon: '✏️', label: 'Edit', action: `edit-msg-${idx}` }]; if (message.role === 'assistant' && idx === state.chatHistory.length - 1) items.push({ icon: '🔄', label: 'Regenerate', action: 'regen-last' }); items.push({ icon: '🗑️', label: 'Delete', action: `delete-msg-${idx}`, danger: true }); const menu = document.getElementById('contextMenu'); menu.innerHTML = items.map(item => `<button class="context-menu-item ${item.danger ? 'danger' : ''}" data-context-action="${item.action}">${item.icon} ${item.label}</button>`).join(''); const menuWidth = 200; const menuHeight = items.length * 40; const maxX = window.innerWidth - menuWidth - 10; const maxY = window.innerHeight - menuHeight - 10; menu.style.left = Math.max(10, Math.min(e.clientX, maxX)) + 'px'; menu.style.top = Math.max(10, Math.min(e.clientY, maxY)) + 'px'; menu.hidden = false; menu.querySelectorAll('.context-menu-item').forEach(item => { item.onclick = () => { handleContextAction(item.dataset.contextAction, idx); menu.hidden = true; }; }); }
 function handleContextAction(action, idx) { if (action === `copy-msg-${idx}`) { utils.copyToClipboard(state.chatHistory[idx].content).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Failed', 'error')); } else if (action === `edit-msg-${idx}`) { const newText = prompt('Edit:', state.chatHistory[idx].content); if (newText !== null && newText.trim()) { state.chatHistory[idx].content = newText.trim(); ui.renderMessages(); ui.showToast('Edited', 'success'); } } else if (action === `delete-msg-${idx}`) { if (!confirm('Delete?')) return; state.chatHistory.splice(idx, 1); ui.renderMessages(); ui.showToast('Deleted', 'info'); } else if (action === 'regen-last') { regenLast(); } }
 function handleChatListClick(e) { const deleteBtn = e.target.closest('[data-action="delete-chat"]'); if (deleteBtn) { e.stopPropagation(); const chatId = deleteBtn.dataset.chatId; if (!confirm('Delete?')) return; state.allChats = state.allChats.filter(c => c.id !== chatId); if (state.currentChatId === chatId) { state.chatHistory = []; state.currentChatId = null; state.selectedIndices.clear(); document.getElementById('copyFab').hidden = true; ui.updateChatTitle('Untitled'); ui.renderMessages(); } storage.saveChats(state.allChats); chat.renderChatList(); ui.showToast('Deleted', 'info'); return; } const item = e.target.closest('.chat-history-item'); if (item) openChat(item.dataset.chatId); }
@@ -946,6 +949,36 @@ function openChat(id) {
 
 async function exportChat() { if (state.chatHistory.length === 0) { ui.showToast('No messages', 'error'); return; } let md = `# ${document.getElementById('chatTitle').textContent}\n\n**Date:** ${new Date().toLocaleString()}\n\n**Model:** ${state.lastReq.model || 'Unknown'}\n\n---\n\n`; state.chatHistory.forEach(m => { if (m.image) md += `### ${m.role === 'user' ? 'User' : 'AI'} (with image)\n${m.content}\n\n`; else md += `### ${m.role === 'user' ? 'User' : 'AI'}\n${m.content}\n\n`; }); const blob = new Blob([md], { type: 'text/markdown' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `chat-${Date.now()}.md`; a.click(); ui.showToast('Exported', 'success'); }
 async function regenLast() { if (state.chatHistory.length < 2) { ui.showToast('No message', 'warning'); return; } const lastAssistantIdx = state.chatHistory.length - 1; const lastUserIdx = state.chatHistory.length - 2; if (state.chatHistory[lastUserIdx].role !== 'user') { ui.showToast('No user message', 'warning'); return; } const lastUserText = state.chatHistory[lastUserIdx].content; state.chatHistory.pop(); ui.renderMessages(); await chat.sendMessage(lastUserText); }
+async function regenMessage(idx) { 
+  if (idx <= 0 || idx >= state.chatHistory.length) { 
+    ui.showToast('Invalid message', 'warning'); 
+    return; 
+  }
+  const msg = state.chatHistory[idx];
+  if (msg.role !== 'assistant') {
+    ui.showToast('Only assistant messages can be regenerated', 'warning');
+    return;
+  }
+  let userMsgIdx = idx - 1;
+  while (userMsgIdx >= 0 && state.chatHistory[userMsgIdx].role !== 'user') {
+    userMsgIdx--;
+  }
+  if (userMsgIdx < 0) {
+    ui.showToast('No user message found', 'warning');
+    return;
+  }
+  const userText = state.chatHistory[userMsgIdx].content;
+  const userImage = state.chatHistory[userMsgIdx].image;
+  
+  state.chatHistory.splice(idx, state.chatHistory.length - idx);
+  ui.renderMessages();
+  
+  if (userImage) {
+    await chat.sendMessage(userText, userImage);
+  } else {
+    await chat.sendMessage(userText);
+  }
+}
 function toggleSelectMode() { state.selectMode = !state.selectMode; const btn = document.getElementById('selectBtn'); const container = document.getElementById('messages'); btn.classList.toggle('active', state.selectMode); btn.textContent = state.selectMode ? '✓ Done' : '☑️ Select'; container.classList.toggle('select-mode-on', state.selectMode); if (!state.selectMode) { state.selectedIndices.clear(); document.getElementById('copyFab').hidden = true; } ui.renderMessages(); }
 function updateSelectUI() { const fab = document.getElementById('copyFab'); const count = document.getElementById('selectedCount'); count.textContent = state.selectedIndices.size; fab.hidden = state.selectedIndices.size === 0; document.querySelectorAll('.msg').forEach((msg, i) => { if (state.selectedIndices.has(i)) msg.classList.add('selected-msg'); else msg.classList.remove('selected-msg'); }); }
 async function copySelected() { if (state.selectedIndices.size === 0) return; const msgs = Array.from(state.selectedIndices).sort().map(i => state.chatHistory[i]); const text = msgs.map(m => `[${m.role.toUpperCase()}]\n${m.content}`).join('\n\n---\n\n'); try { await utils.copyToClipboard(text); ui.showToast(`Copied ${state.selectedIndices.size} msgs`, 'success'); toggleSelectMode(); } catch (e) { ui.showToast('Copy failed', 'error'); } }
