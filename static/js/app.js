@@ -130,7 +130,8 @@ const api = {
     return await res.json();
   },
   async getModels(providerId, refresh = false) {
-    const url = refresh ? `/providers/${providerId}/models?refresh=true` : `/providers/${providerId}/models`;
+    // ✅ همیشه از endpoint /models استفاده می‌کنه که مستقیماً از 9router مدل‌ها رو می‌گیره
+    const url = refresh ? `/models?refresh=true` : `/models`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
@@ -388,14 +389,7 @@ const chat = {
     const provider = providerManager.getCurrentProvider();
     if (!provider) { ui.showToast('No provider selected', 'warning'); return; }
     
-    const activeKey = provider.keys?.find(k => k.is_default && k.enabled) || 
-                      provider.keys?.find(k => k.enabled) || 
-                      provider.keys?.[0];
-    
-    if (!activeKey || !activeKey.api_key) { 
-      ui.showToast('No API key - Add one in Key Manager', 'warning'); 
-      return; 
-    }
+    // ✅ برای 9router نیازی به API key نیست - از environment variable استفاده می‌کنه
     
     const model = document.getElementById('model').value;
     if (!model) { ui.showToast('Select a model', 'warning'); return; }
@@ -406,7 +400,7 @@ const chat = {
     if (textOverride === null) { input.value = ''; input.style.height = 'auto'; input.classList.remove('rtl'); }
     if (state.currentImage) this.removeImagePreview();
     if (state.chatHistory.length === 1) ui.updateChatTitle(utils.truncate(text || 'Image'));
-    state.lastReq = { provider: provider.id, model, apiKey: activeKey.api_key };
+    state.lastReq = { provider: provider.id, model };
     state.assistantIndex = state.chatHistory.length;
     state.chatHistory.push({ role: 'assistant', content: '', streaming: true });
     ui.renderMessages();
@@ -424,9 +418,9 @@ const chat = {
     try {
       showStatusIndicator('Generating...', 'generating');
       
+      // ✅ برای 9router نیازی به apiKey نیست - از environment variable استفاده می‌کنه
       const body = await api.streamMessage({ 
         provider: provider.id, 
-        apiKey: activeKey.api_key, 
         model, 
         messages: state.chatHistory.slice(0, -1) 
       }, state.abortCtrl.signal);
