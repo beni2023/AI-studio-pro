@@ -12,7 +12,7 @@ from functools import wraps
 
 from config import CONFIG, MAX_FILE_SIZE, ALLOWED_EXTENSIONS
 from services.key_manager import KeyManager
-from services.provider_factory import ProviderFactory, ProviderAdapter
+from services.provider_factory import ProviderFactory, NineRouterAdapter
 from services.context_manager import ContextManager
 from services.session_pool import session_pool
 from utils.logger import log_info, log_error, log_warning
@@ -163,205 +163,145 @@ def health():
 
 
 # ============ Provider Endpoints ============
-
-@app.route("/providers")
-@handle_api_errors
-def get_providers():
-    """دریافت همه Providerها"""
-    providers = KeyManager.get_providers()
-    
-    for p in providers:
-        active_key = KeyManager.get_active_key(p['id'])
-        p['has_key'] = active_key is not None
-        p['key_count'] = len(p.get('keys', []))
-        p['model_count'] = len(p.get('models_cache', []))
-    
-    return jresponse({"providers": providers})
-
-
-@app.route("/providers/<provider_id>")
-@handle_api_errors
-def get_provider(provider_id):
-    """دریافت یک Provider"""
-    provider = KeyManager.get_provider(provider_id)
-    if not provider:
-        raise APIError("Provider not found", 404)
-    return jresponse(provider)
+# ✅ حذف شده - دیگر نیازی به مدیریت providerها نیست، فقط 9router استفاده می‌شود
 
 @app.route("/providers/presets")
 @handle_api_errors
 def get_presets():
-    """✅ دریافت preset‌های آماده"""
-    presets = KeyManager.get_presets()
-    return jresponse({"presets": presets})
+    """✅ دریافت preset‌های آماده (برای سازگاری)"""
+    return jresponse({"presets": {}})
 
 
 @app.route("/providers", methods=["POST"])
 @handle_api_errors
 @validate_json_request
 def add_provider():
-    """اضافه کردن Provider"""
-    data = request.json or {}
-    
-    if not data.get('id') or not data.get('name'):
-        raise ValidationError("ID and Name are required")
-    
-    result = KeyManager.add_provider(data)
-    
-    if result['success']:
-        refresh_providers()
-    
-    return jresponse(result)
+    """❌ غیرفعال - فقط 9router پشتیبانی می‌شود"""
+    return jresponse({
+        "success": False, 
+        "error": "Only 9router is supported. All models are automatically fetched from 9router API."
+    }, 400)
 
 
 @app.route("/providers/<provider_id>", methods=["PUT"])
 @handle_api_errors
 @validate_json_request
 def update_provider(provider_id):
-    """به‌روزرسانی Provider"""
-    data = request.json or {}
-    success = KeyManager.update_provider(provider_id, data)
-    
-    if success:
-        refresh_providers()
-    
-    return jresponse({"success": success})
+    """❌ غیرفعال - فقط 9router پشتیبانی می‌شود"""
+    return jresponse({
+        "success": False, 
+        "error": "Only 9router is supported."
+    }, 400)
 
 
 @app.route("/providers/<provider_id>", methods=["DELETE"])
 @handle_api_errors
 def delete_provider(provider_id):
-    """حذف Provider"""
-    success = KeyManager.delete_provider(provider_id)
-    
-    if success:
-        refresh_providers()
-    
-    return jresponse({"success": success})
+    """❌ غیرفعال - فقط 9router پشتیبانی می‌شود"""
+    return jresponse({
+        "success": False, 
+        "error": "Only 9router is supported."
+    }, 400)
 
 
 # ============ Key Endpoints ============
+# ✅ حذف شده - 9router از NINEROUTER_API_KEY environment variable استفاده می‌کند
 
 @app.route("/providers/<provider_id>/keys")
 @handle_api_errors
 def get_keys(provider_id):
-    """دریافت کلیدهای یک Provider"""
-    keys = KeyManager.get_keys(provider_id)
-    
-    safe_keys = []
-    for k in keys:
-        safe_key = k.copy()
-        if safe_key.get('api_key'):
-            key = safe_key['api_key']
-            if len(key) > 10:
-                safe_key['api_key'] = key[:6] + '••••' + key[-4:]
-        safe_keys.append(safe_key)
-    
-    return jresponse({"keys": safe_keys})
+    """❌ غیرفعال - فقط 9router پشتیبانی می‌شود"""
+    return jresponse({
+        "success": False, 
+        "error": "Only 9router is supported. API key is configured via NINEROUTER_API_KEY environment variable."
+    }, 400)
 
 
 @app.route("/providers/<provider_id>/keys", methods=["POST"])
 @handle_api_errors
 @validate_json_request
 def add_key(provider_id):
-    """اضافه کردن کلید"""
-    data = request.json or {}
-    
-    if not data.get('api_key'):
-        raise ValidationError("API Key is required")
-    
-    result = KeyManager.add_key(provider_id, data)
-    
-    if result['success']:
-        refresh_providers()
-    
-    return jresponse(result)
+    """❌ غیرفعال - فقط 9router پشتیبانی می‌شود"""
+    return jresponse({
+        "success": False, 
+        "error": "Only 9router is supported."
+    }, 400)
 
 
 @app.route("/providers/<provider_id>/keys/<key_id>", methods=["PUT"])
 @handle_api_errors
 @validate_json_request
 def update_key(provider_id, key_id):
-    """به‌روزرسانی کلید"""
-    data = request.json or {}
-    success = KeyManager.update_key(provider_id, key_id, data)
-    return jresponse({"success": success})
+    """❌ غیرفعال - فقط 9router پشتیبانی می‌شود"""
+    return jresponse({
+        "success": False, 
+        "error": "Only 9router is supported."
+    }, 400)
 
 
 @app.route("/providers/<provider_id>/keys/<key_id>", methods=["DELETE"])
 @handle_api_errors
 def delete_key(provider_id, key_id):
-    """حذف کلید"""
-    success = KeyManager.delete_key(provider_id, key_id)
-    
-    if success:
-        refresh_providers()
-    
-    return jresponse({"success": success})
+    """❌ غیرفعال - فقط 9router پشتیبانی می‌شود"""
+    return jresponse({
+        "success": False, 
+        "error": "Only 9router is supported."
+    }, 400)
 
 
 @app.route("/providers/<provider_id>/keys/<key_id>/test", methods=["POST"])
 @handle_api_errors
 def test_key(provider_id, key_id):
-    """تست کلید"""
-    keys = KeyManager.get_keys(provider_id)
-    key = next((k for k in keys if k['id'] == key_id), None)
-    
-    if not key:
-        raise APIError("Key not found", 404)
-    
-    adapter = providers_cache.get(provider_id)
-    if not adapter:
-        raise APIError("Provider not found", 404)
-    
-    result = adapter.test_connection(key['api_key'])
-    
-    KeyManager.update_key(provider_id, key_id, {
-        'last_tested': time.strftime("%Y-%m-%dT%H:%M:%S"),
-        'status': 'active' if result['success'] else 'failed'
-    })
-    
-    return jresponse(result)
+    """❌ غیرفعال - فقط 9router پشتیبانی می‌شود"""
+    return jresponse({
+        "success": False, 
+        "error": "Only 9router is supported."
+    }, 400)
 
 
 # ============ Models Endpoints ============
 
-@app.route("/providers/<provider_id>/models")
+@app.route("/models")
 @handle_api_errors
-def get_models(provider_id):
-    """دریافت مدل‌ها (از cache یا fetch)"""
+def get_all_models():
+    """✅ دریافت همه مدل‌ها از 9router"""
     force_refresh = request.args.get('refresh', 'false').lower() == 'true'
     
-    log_info(f"Getting models for provider: {provider_id}")
+    log_info("Getting all models from 9router...")
     
-    if not force_refresh:
-        cache = KeyManager.get_models_cache(provider_id)
-        if cache:
-            log_info(f"Returning {len(cache)} models from cache")
-            return jresponse({"models": cache, "from_cache": True})
-    
-    adapter = providers_cache.get(provider_id)
+    # ✅ استفاده مستقیم از 9router adapter
+    adapter = providers_cache.get('9router')
     if not adapter:
-        log_error(f"Provider not found in cache: {provider_id}")
-        adapter = ProviderFactory.create(provider_id)
+        adapter = ProviderFactory.create('9router')
         if not adapter:
-            raise APIError(f"Provider not found: {provider_id}", 404)
-        providers_cache[provider_id] = adapter
+            raise APIError("9router adapter not found", 500)
+        providers_cache['9router'] = adapter
     
     try:
         models = adapter.fetch_models()
         
         if models:
-            KeyManager.update_models_cache(provider_id, models)
-            log_info(f"✅ Fetched and cached {len(models)} models")
+            log_info(f"✅ Fetched {len(models)} models from 9router")
         else:
-            log_warning(f"No models returned for {provider_id}")
+            log_warning("No models returned from 9router")
         
-        return jresponse({"models": models, "from_cache": False})
+        return jresponse({
+            "models": models, 
+            "from_cache": False,
+            "provider": "9router"
+        })
     
     except Exception as e:
-        log_error(f"Error fetching models for {provider_id}: {e}", exc_info=True)
+        log_error(f"Error fetching models from 9router: {e}", exc_info=True)
         return jresponse({"models": [], "error": str(e)}, 500)
+
+
+@app.route("/providers/<provider_id>/models")
+@handle_api_errors
+def get_models(provider_id):
+    """✅ هدایت به endpoint اصلی /models"""
+    # ✅ ریدایرکت به /models برای سازگاری
+    return get_all_models()
 
 
 # ============ Streaming Endpoint ============
@@ -370,49 +310,42 @@ def get_models(provider_id):
 @handle_api_errors
 @validate_json_request
 def stream():
-    """Stream response با Response class"""
+    """Stream response از طریق 9router"""
     def generate():
         try:
             data = request.json or {}
-            provider_id = data.get("provider")
-            api_key = data.get("apiKey")
+            provider_id = data.get("provider", "9router")  # ✅ پیش‌فرض 9router
+            api_key = data.get("apiKey")  # ✅ دیگر استفاده نمی‌شود، از env استفاده می‌شود
             model = data.get("model")
             messages = data.get("messages", [])
-            custom_url = data.get("customUrl", "")
+            custom_url = data.get("customUrl", "")  # ✅ دیگر استفاده نمی‌شود
             
             log_info(f"📥 Stream request: provider={provider_id}, model={model}")
-            
-            if custom_url:
-                custom_url = clean_custom_url(custom_url)
-            
-            if not provider_id:
-                yield f"data: {json.dumps({'error': 'Provider is required'})}\n\n"
-                return
-            
-            if not validate_api_key(api_key):
-                yield f"data: {json.dumps({'error': 'Invalid API key'})}\n\n"
-                return
             
             if not model:
                 yield f"data: {json.dumps({'error': 'Model is required'})}\n\n"
                 return
             
             prepared_messages = ContextManager.prepare_context(messages)
-            provider = providers_cache.get(provider_id)
             
+            # ✅ همیشه از 9router استفاده می‌شود
+            provider = providers_cache.get('9router')
             if not provider:
-                yield f"data: {json.dumps({'error': f'Provider {provider_id} not found'})}\n\n"
-                return
+                provider = ProviderFactory.create('9router')
+                if not provider:
+                    yield f"data: {json.dumps({'error': '9router adapter not found'})}\n\n"
+                    return
+                providers_cache['9router'] = provider
             
-            log_info(f"🚀 Starting stream")
+            log_info(f"🚀 Starting stream via 9router")
             
             import asyncio
             
             async def stream_gen():
+                # ✅ حذف apiKey و custom_url - فقط از 9router استفاده می‌شود
                 async for response in provider.stream_response(
-                    prepared_messages, model, api_key, custom_url=custom_url
+                    prepared_messages, model
                 ):
-                    # ✅ استفاده از to_dict()
                     response_dict = response.to_dict()
                     log_info(f"📤 Yielding: {response_dict}")
                     yield f"data: {json.dumps(response_dict, ensure_ascii=False)}\n\n"
