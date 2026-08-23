@@ -163,7 +163,23 @@ def health():
 
 
 # ============ Provider Endpoints ============
-# ✅ حذف شده - دیگر نیازی به مدیریت providerها نیست، فقط 9router استفاده می‌شود
+
+@app.route("/providers")
+@handle_api_errors
+def get_providers():
+    """✅ دریافت لیست providerها - فقط 9router"""
+    # ✅ همیشه فقط 9router برمی‌گردونه
+    return jresponse({
+        "providers": [{
+            "id": "9router",
+            "name": "9Router (All Providers)",
+            "icon": "🌐",
+            "type": "openai_compatible",
+            "has_key": bool(os.environ.get('NINEROUTER_API_KEY')),
+            "keys": []
+        }]
+    })
+
 
 @app.route("/providers/presets")
 @handle_api_errors
