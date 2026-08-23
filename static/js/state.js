@@ -16,6 +16,8 @@ export const state = {
   MAX_TOASTS: 4,
   modelsLoaded: false,
   assistantIndex: -1,
+  selectedText: '',
+  quoteBoxVisible: false,
   
   COMMANDS: [
     { name: 'New Chat', icon: '✨', shortcut: 'Ctrl+N', action: 'newChat' },

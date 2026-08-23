@@ -25,6 +25,7 @@ export const utils = {
     let processed = text;
     const codeBlocks = [];
     
+    // Extract code blocks first to protect them from HTML escaping
     processed = processed.replace(/```([a-zA-Z0-9_+\-]+)?\n([\s\S]*?)```/g, (match, lang, code) => {
       const idx = codeBlocks.length;
       codeBlocks.push({ lang: lang || 'code', code: code.trim() });
@@ -35,6 +36,7 @@ export const utils = {
     processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     processed = processed.replace(/\n/g, '<br>');
     
+    // Restore code blocks with copy button
     processed = processed.replace(/__CODEBLOCK_(\d+)__/g, (match, idx) => {
       const block = codeBlocks[parseInt(idx)];
       return `<pre><div class="code-head"><span class="code-lang">${this.escapeHtml(block.lang)}</span><button class="code-copy-btn">📋 Copy</button></div><code class="language-${block.lang}">${this.escapeHtml(block.code)}</code></pre>`;
