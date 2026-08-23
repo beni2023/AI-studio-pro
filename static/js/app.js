@@ -921,120 +921,37 @@ function initEventListeners() {
   const refreshModelsBtn = document.getElementById('refreshModelsBtn');
   if (refreshModelsBtn) refreshModelsBtn.addEventListener('click', forceRefreshModels);
   
-  document.getElementById('openKeyManagerBtn').addEventListener('click', () => { document.getElementById('keyManagerModal').hidden = false; renderKeyManagerUI(); });
-  document.getElementById('closeKeyManagerBtn').addEventListener('click', () => { document.getElementById('keyManagerModal').hidden = true; });
-  // document.getElementById('kmAddProviderBtn').addEventListener('click', () => { document.getElementById('addProviderModal').hidden = false; });
-  // document.getElementById('apCancelBtn').addEventListener('click', () => { document.getElementById('addProviderModal').hidden = true; });
-  // document.getElementById('apSaveBtn').addEventListener('click', saveProvider);
-  // document.getElementById('apPreset').addEventListener('change', (e) => { applyPreset(e.target.value); });
-  
-  document.getElementById('kmAddKeyBtn').addEventListener('click', () => {
-    updateProviderSelectInKeyModal();
-    const currentProvider = providerManager.getCurrentProvider();
-    if (currentProvider) document.getElementById('akProvider').value = currentProvider.id;
-    document.getElementById('addKeyModal').hidden = false;
+  document.getElementById('openKeyManagerBtn').addEventListener('click', () => { 
+    document.getElementById('keyManagerModal').hidden = false; 
+    renderKeyManagerUI(); 
   });
-  document.getElementById('akCancelBtn').addEventListener('click', () => { document.getElementById('addKeyModal').hidden = true; });
-  document.getElementById('akSaveBtn').addEventListener('click', saveKey);
+  document.getElementById('closeKeyManagerBtn').addEventListener('click', () => { 
+    document.getElementById('keyManagerModal').hidden = true; 
+  });
+  document.getElementById('kmAddKeyBtn').addEventListener('click', () => {
+    ui.showToast('9Router API key is configured via NINEROUTER_API_KEY environment variable', 'info');
+  });
 }
 
 function renderKeyManagerUI() {
   const container = document.getElementById('kmKeysList');
   if (!container) return;
-  updateProviderSelectInKeyModal();
   
-  if (providerManager.providers.length === 0) {
-    container.innerHTML = '<div class="empty-keys"><div class="empty-keys-icon">🔑</div><div>No providers yet</div><div style="font-size:0.8rem; margin-top:8px;">Click "+ Add Provider" to get started</div></div>';
-    return;
-  }
-  
-  let html = '';
-  providerManager.providers.forEach(p => {
-    html += `<div class="provider-section"><div class="provider-section-title"><span>${p.icon || '🔑'} ${utils.escapeHtml(p.name)}</span><span style="margin-left:auto; font-size:0.7rem; color:var(--text-muted);">${p.keys?.length || 0} keys</span><button onclick="deleteProviderFromUI('${p.id}')" style="margin-left:8px; background:var(--danger); color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.7rem;" title="Delete Provider">🗑️ Delete</button></div>`;
-    
-    if (p.keys && p.keys.length > 0) {
-      p.keys.forEach(key => {
-        const isActive = key.is_default;
-        html += `<div class="key-item ${isActive ? 'active' : ''}"><div class="key-item-header"><div class="key-item-name">🔑 ${utils.escapeHtml(key.name)}</div>${isActive ? '<span class="key-item-badge">DEFAULT</span>' : ''}</div><div class="key-item-value">${utils.maskKey(key.api_key)}</div><div class="key-item-actions"><button onclick="testKeyFromUI('${p.id}', '${key.id}')">🧪 Test</button><button class="danger" onclick="deleteKeyFromUI('${p.id}', '${key.id}')">🗑️</button></div></div>`;
-      });
-    } else {
-      html += `<div style="padding:12px; text-align:center; color:var(--text-muted); font-size:0.8rem;">No keys - Click "Add Key" above</div>`;
-    }
-    html += `</div>`;
-  });
-  container.innerHTML = html;
+  // ✅ نمایش پیام ساده - فقط 9router پشتیبانی می‌شود
+  container.innerHTML = '<div class="empty-keys"><div class="empty-keys-icon">🌐</div><div>9Router is the only provider</div><div style="font-size:0.8rem; margin-top:8px;">All models are automatically fetched from 9Router API.</div><div style="font-size:0.75rem; margin-top:4px; color:var(--text-muted);">Make sure NINEROUTER_API_KEY is set in your .env file.</div></div>';
 }
 
-function updateProviderSelectInKeyModal() {
-  const select = document.getElementById('akProvider');
-  if (!select) return;
-  if (providerManager.providers.length === 0) {
-    select.innerHTML = '<option value="">No providers available</option>';
-    return;
-  }
-  select.innerHTML = providerManager.providers.map(p => `<option value="${p.id}">${p.icon || ''} ${utils.escapeHtml(p.name)}</option>`).join('');
-}
-
-async function saveKey() {
-  const provider = document.getElementById('akProvider').value;
-  const keyData = {
-    name: document.getElementById('akName').value.trim() || 'Unnamed Key',
-    api_key: document.getElementById('akApiKey').value.trim(),
-    is_default: document.getElementById('akDefault').checked
-  };
-  
-  if (!provider) { ui.showToast('Please select a provider', 'warning'); return; }
-  if (!keyData.api_key) { ui.showToast('API Key is required', 'warning'); return; }
-  
-  const success = await keyManager.addKey(provider, keyData);
-  if (success) {
-    document.getElementById('addKeyModal').hidden = true;
-    document.getElementById('akName').value = '';
-    document.getElementById('akApiKey').value = '';
-    document.getElementById('akDefault').checked = false;
-    renderKeyManagerUI();
-    
-    const currentProvider = providerManager.getCurrentProvider();
-    if (currentProvider && currentProvider.id === provider) {
-      providerManager.loadActiveKeyToField();
-      await loadModels();
-    }
-  }
-}
-
+// ✅ توابع حذف شده - 9Router از environment variable استفاده می‌کند
 async function testKeyFromUI(providerId, keyId) {
-  ui.showToast('Testing...', 'info');
-  const result = await keyManager.testKey(providerId, keyId);
-  ui.showToast(result.message, result.success ? 'success' : 'error');
+  ui.showToast('9Router API key is configured via environment variable. Check NINEROUTER_API_KEY in your .env file.', 'info');
 }
 
 async function deleteKeyFromUI(providerId, keyId) {
-  if (!confirm('Delete this key?')) return;
-  const success = await keyManager.deleteKey(providerId, keyId);
-  if (success) {
-    renderKeyManagerUI();
-    const currentProvider = providerManager.getCurrentProvider();
-    if (currentProvider && currentProvider.id === providerId) {
-      providerManager.loadActiveKeyToField();
-      await loadModels();
-    }
-  }
+  ui.showToast('Cannot delete keys - 9Router uses environment variable NINEROUTER_API_KEY', 'warning');
 }
 
 async function deleteProviderFromUI(providerId) {
-  if (!confirm('Delete this provider and all its keys?')) return;
-  const success = await providerManager.deleteProvider(providerId);
-  if (success) {
-    renderKeyManagerUI();
-    const currentProvider = providerManager.getCurrentProvider();
-    if (!currentProvider && providerManager.providers.length > 0) {
-      document.getElementById('provider').value = providerManager.providers[0].id;
-      providerManager.loadActiveKeyToField();
-      await loadModels();
-    } else if (providerManager.providers.length === 0) {
-      document.getElementById('model').innerHTML = '<option value="">No models</option>';
-    }
-  }
+  ui.showToast('Cannot delete 9Router - it is the only supported provider', 'warning');
 }
 
 function handleMessageClick(e) { const target = e.target; if (target.classList.contains('chip')) { const text = target.dataset.chip; const prompt = document.getElementById('prompt'); prompt.value = text; utils.checkRTL(prompt); prompt.focus(); return; } if (target.classList.contains('msg-cb')) { const idx = parseInt(target.dataset.idx); if (target.checked) state.selectedIndices.add(idx); else state.selectedIndices.delete(idx); updateSelectUI(); return; } const action = target.dataset.action; const idx = parseInt(target.dataset.idx); if (action === 'copy-msg') { const msg = state.chatHistory[idx]; utils.copyToClipboard(msg.content).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Copy failed', 'error')); } else if (action === 'toggle-long') { const bubble = target.closest('.bubble'); bubble.classList.toggle('expanded'); target.textContent = bubble.classList.contains('expanded') ? 'Show less ▲' : 'Show more ▼'; } else if (action === 'download-image') { const msg = state.chatHistory[idx]; const link = document.createElement('a'); link.href = msg.image; link.download = `image-${idx}.png`; link.click(); ui.showToast('Downloaded', 'success'); } else if (action === 'copy-image') { const msg = state.chatHistory[idx]; fetch(msg.image).then(res => res.blob()).then(blob => navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Failed', 'error')); } else if (action === 'open-image') { window.open(target.src, '_blank'); } }

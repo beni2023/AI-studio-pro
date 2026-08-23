@@ -216,39 +216,7 @@
 
 <!-- ============ MODALS ============ -->
 
-<!-- Add Key Modal -->
-<div class="modal-overlay" id="addKeyModal" hidden>
-  <div class="modal" style="max-width:500px; width:100%;">
-    <h3 class="modal-title">🔑 Add New API Key</h3>
-    
-    <div style="display:flex; flex-direction:column; gap:12px;">
-      <div>
-        <label class="form-label">Provider</label>
-        <select class="form-select" id="akProvider"></select>
-      </div>
-      
-      <div>
-        <label class="form-label">Key Name</label>
-        <input type="text" class="form-input" id="akName" placeholder="e.g., Main Key">
-      </div>
-      
-      <div>
-        <label class="form-label">API Key</label>
-        <input type="password" class="form-input" id="akApiKey" placeholder="sk-... or your-api-key">
-      </div>
-      
-      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-        <input type="checkbox" id="akDefault">
-        <span>Set as default key</span>
-      </label>
-      
-      <div class="modal-actions">
-        <button class="btn" id="akCancelBtn">Cancel</button>
-        <button class="btn btn-primary" id="akSaveBtn">💾 Save Key</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- Add Key Modal - Removed (9Router uses environment variable) -->
 
 <!-- Copy Preview Modal -->
 <div class="modal-overlay" id="copyModal" hidden>
@@ -272,8 +240,7 @@
     
     <!-- Toolbar -->
     <div style="display:flex; gap:8px; margin-bottom:16px;">
-      <button class="btn" id="kmAddProviderBtn" style="flex:1;" hidden>➕ Add Provider</button>
-      <button class="btn btn-primary" id="kmAddKeyBtn" style="flex:1;">🔑 Add Key</button>
+      <button class="btn btn-primary" id="kmAddKeyBtn" style="flex:1;" title="API key is configured via NINEROUTER_API_KEY environment variable">ℹ️ 9Router Info</button>
     </div>
     
     <!-- Keys List -->
