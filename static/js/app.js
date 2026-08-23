@@ -923,10 +923,10 @@ function initEventListeners() {
   
   document.getElementById('openKeyManagerBtn').addEventListener('click', () => { document.getElementById('keyManagerModal').hidden = false; renderKeyManagerUI(); });
   document.getElementById('closeKeyManagerBtn').addEventListener('click', () => { document.getElementById('keyManagerModal').hidden = true; });
-  document.getElementById('kmAddProviderBtn').addEventListener('click', () => { document.getElementById('addProviderModal').hidden = false; });
-  document.getElementById('apCancelBtn').addEventListener('click', () => { document.getElementById('addProviderModal').hidden = true; });
-  document.getElementById('apSaveBtn').addEventListener('click', saveProvider);
-  document.getElementById('apPreset').addEventListener('change', (e) => { applyPreset(e.target.value); });
+  // document.getElementById('kmAddProviderBtn').addEventListener('click', () => { document.getElementById('addProviderModal').hidden = false; });
+  // document.getElementById('apCancelBtn').addEventListener('click', () => { document.getElementById('addProviderModal').hidden = true; });
+  // document.getElementById('apSaveBtn').addEventListener('click', saveProvider);
+  // document.getElementById('apPreset').addEventListener('change', (e) => { applyPreset(e.target.value); });
   
   document.getElementById('kmAddKeyBtn').addEventListener('click', () => {
     updateProviderSelectInKeyModal();

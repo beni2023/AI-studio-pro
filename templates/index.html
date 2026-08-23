@@ -272,8 +272,8 @@
     
     <!-- Toolbar -->
     <div style="display:flex; gap:8px; margin-bottom:16px;">
-      <button class="btn btn-primary" id="kmAddProviderBtn" style="flex:1;">➕ Add Provider</button>
-      <button class="btn" id="kmAddKeyBtn" style="flex:1;">🔑 Add Key</button>
+      <button class="btn" id="kmAddProviderBtn" style="flex:1;" hidden>➕ Add Provider</button>
+      <button class="btn btn-primary" id="kmAddKeyBtn" style="flex:1;">🔑 Add Key</button>
     </div>
     
     <!-- Keys List -->
@@ -286,91 +286,6 @@
   </div>
 </div>
 
-label">Base URL</label>
-        <input type="text" class="form-input" id="apBaseUrl" placeholder="https://api.openmodel.ai">
-      </div>
-      
-      <!-- ✅ Endpoints (قابل ویرایش) -->
-      <details style="margin-top:8px;">
-        <summary style="cursor:pointer; font-size:0.85rem; color:var(--text-secondary);">
-          ⚙️ Advanced: Custom<!-- Add Provider Modal -->
-<div class="modal-overlay" id="addProviderModal" hidden>
-  <div class="modal" style="max-width:550px; width:100%;">
-    <h3 class="modal-title">➕ Add New Provider</h3>
-    
-    <div style="display:flex; flex-direction:column; gap:12px;">
-      
-      <!-- Preset Selector -->
-      <div>
-        <label class="form-label">Quick Setup (Preset)</label>
-        <select class="form-select" id="apPreset">
-          <option value="">-- Custom Provider --</option>
-          <option value="openrouter">🌐 OpenRouter</option>
-          <option value="openmodel">🤖 OpenModel (Responses API)</option>
-          <option value="anthropic">🎭 Anthropic (Claude)</option>
-          <option value="gemini">💎 Google Gemini</option>
-          <option value="openai">🧠 OpenAI</option>
-        </select>
-        <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">
-          💡 Select a preset to auto-fill settings
-        </div>
-      </div>
-      
-      <div>
-        <label class="form-label">Provider ID</label>
-        <input type="text" class="form-input" id="apId" placeholder="e.g., openmodel">
-      </div>
-      
-      <div>
-        <label class="form-label">Provider Name</label>
-        <input type="text" class="form-input" id="apName" placeholder="e.g., OpenModel">
-      </div>
-      
-      <div>
-        <label class="form-label">Icon (emoji)</label>
-        <input type="text" class="form-input" id="apIcon" placeholder="🤖" maxlength="2">
-      </div>
-      
-      <!-- Protocol Selector -->
-      <div>
-        <label class="form-label">Protocol</label>
-        <select class="form-select" id="apProtocol">
-          <option value="chat_completions">OpenAI Chat (/v1/chat/completions)</option>
-          <option value="responses">OpenAI Responses (/v1/responses)</option>
-          <option value="messages">Anthropic Messages (/v1/messages)</option>
-          <option value="gemini">Google Gemini</option>
-        </select>
-      </div>
-      
-      <div>
-        <label class="form-label">Base URL</label>
-        <input type="text" class="form-input" id="apBaseUrl" placeholder="https://api.openmodel.ai">
-      </div>
-      
-      <!-- Advanced Endpoints -->
-      <details style="margin-top:8px;">
-        <summary style="cursor:pointer; font-size:0.85rem; color:var(--text-secondary);">
-          ⚙️ Advanced: Custom Endpoints
-        </summary>
-        <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px; padding:12px; background:var(--bg-input); border-radius:var(--radius-md);">
-          <div>
-            <label class="form-label">Models Endpoint</label>
-            <input type="text" class="form-input" id="apModelsEndpoint" placeholder="/v1/models">
-          </div>
-          <div>
-            <label class="form-label">Chat Endpoint</label>
-            <input type="text" class="form-input" id="apChatEndpoint" placeholder="/v1/responses">
-          </div>
-        </div>
-      </details>
-      
-      <div class="modal-actions">
-        <button class="btn" id="apCancelBtn" style="flex:1;">Cancel</button>
-        <button class="btn btn-primary" id="apSaveBtn" style="flex:1;">💾 Save Provider</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- Command Palette -->
 <div class="command-palette-overlay" id="commandPalette" hidden>
