@@ -525,10 +525,11 @@ const chat = {
     if (!streamEl) {
       const isRtl = utils.isRTL(text);
       streamEl = document.createElement('div');
-      streamEl.className = `streaming-text ${isRtl ? 'rtl' : ''}`;
+      streamEl.className = `streaming-text md ${isRtl ? 'rtl' : ''}`;
       bubble.appendChild(streamEl);
     }
-    streamEl.textContent = text;
+    streamEl.innerHTML = utils.formatMarkdown(text);
+    ui.addCodeCopyButtons();
     container.scrollTop = container.scrollHeight;
   },
   removeImagePreview() { state.currentImage = null; const container = document.getElementById('imagePreviewContainer'); container.innerHTML = ''; container.hidden = true; },
@@ -1202,6 +1203,11 @@ function showQuoteBox(text) {
     </div>
     <button class="quote-close" title="Cancel reply">✕</button>
   `;
+  
+  // Add code copy functionality to quoted text if it contains code
+  setTimeout(() => {
+    ui.addCodeCopyButtons();
+  }, 0);
   
   quoteBox.querySelector('.quote-close').addEventListener('click', clearQuoteBox);
   
