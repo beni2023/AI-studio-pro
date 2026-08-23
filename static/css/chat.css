@@ -146,6 +146,20 @@
   border-color: var(--primary);
 }
 
+.msg-action[data-action="regen-msg"] {
+  padding: 3px 6px;
+  font-size: var(--font-sm);
+}
+
+.msg-action[data-action="regen-msg"]:hover {
+  animation: spin 1s ease-in-out;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ============ Selection Mode ============ */
 
 .msg-cb {
