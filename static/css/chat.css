@@ -417,6 +417,94 @@
   line-height: 1.7;
 }
 
+.streaming-text.md {
+  white-space: normal;
+}
+
+.streaming-text.md pre {
+  background: #0d1117;
+  padding: 0;
+  border-radius: var(--radius-md);
+  margin: var(--space-md) 0;
+  overflow: hidden;
+  border: 1px solid var(--primary-light);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.streaming-text.md .code-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, var(--primary-light), rgba(236, 72, 153, 0.2));
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  border-bottom: 2px solid var(--primary);
+  font-weight: 600;
+}
+
+.streaming-text.md .code-lang {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.streaming-text.md .code-lang::before {
+  content: '💻';
+  font-size: var(--font-md);
+}
+
+.streaming-text.md .code-copy-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  transition: all var(--transition-normal);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.streaming-text.md .code-copy-btn:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.streaming-text.md .code-copy-btn.copied {
+  background: var(--success-light);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.streaming-text.md pre code {
+  display: block;
+  padding: var(--space-lg);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  color: #e0e0f0;
+  white-space: pre;
+  line-height: 1.6;
+  background: transparent;
+}
+
+.streaming-text.md code:not(pre code) {
+  background: var(--primary-light);
+  color: #ff79c6;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  border: 1px solid var(--primary-light);
+}
+
 .streaming-text.rtl {
   direction: rtl;
   text-align: right;
@@ -720,6 +808,92 @@
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Code blocks inside quote-box */
+.quote-text pre {
+  background: #0d1117;
+  padding: 0;
+  border-radius: var(--radius-md);
+  margin: var(--space-sm) 0;
+  overflow: hidden;
+  border: 1px solid var(--primary-light);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  position: relative;
+  max-width: 100%;
+}
+
+.quote-text .code-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, var(--primary-light), rgba(236, 72, 153, 0.2));
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-xs);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  border-bottom: 2px solid var(--primary);
+  font-weight: 600;
+}
+
+.quote-text .code-lang {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.quote-text .code-lang::before {
+  content: '💻';
+  font-size: var(--font-sm);
+}
+
+.quote-text .code-copy-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  transition: all var(--transition-normal);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quote-text .code-copy-btn:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.quote-text .code-copy-btn.copied {
+  background: var(--success-light);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.quote-text pre code {
+  display: block;
+  padding: var(--space-md);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: #e0e0f0;
+  white-space: pre;
+  line-height: 1.5;
+  background: transparent;
+}
+
+.quote-text code:not(pre code) {
+  background: var(--primary-light);
+  color: #ff79c6;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  border: 1px solid var(--primary-light);
 }
 
 .quote-close {
