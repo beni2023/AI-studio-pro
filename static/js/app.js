@@ -494,7 +494,9 @@ const chat = {
       if (e.name === 'AbortError') {
         state.chatHistory[state.assistantIndex].content += '\n\n*[Stopped]*';
       } else {
-        state.chatHistory[state.assistantIndex].content = '❌ Network Error: ' + e.message;
+        // Use enhanced error handling
+        showErrorNotification(e, 'sendMessage');
+        state.chatHistory[state.assistantIndex].content = '❌ ' + showErrorNotification(e, 'sendMessage');
       }
       ui.renderMessages();
       
@@ -772,6 +774,38 @@ function hideStatusIndicator() {
   }
 }
 
+// Enhanced Error Handling - Shows clear error messages to users
+function showErrorNotification(error, context = '') {
+  let userMessage = 'An error occurred';
+  let technicalDetails = '';
+  
+  if (error.name === 'AbortError' || error.message.includes('Aborted')) {
+    userMessage = 'Request cancelled by user';
+  } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+    userMessage = 'Network error - Please check your internet connection';
+    technicalDetails = error.message;
+  } else if (error.message.includes('HTTP 401') || error.message.includes('Unauthorized')) {
+    userMessage = 'Authentication failed - Please check your API key';
+    technicalDetails = error.message;
+  } else if (error.message.includes('HTTP 429')) {
+    userMessage = 'Rate limit exceeded - Please wait a moment';
+    technicalDetails = error.message;
+  } else if (error.message.includes('HTTP 5')) {
+    userMessage = 'Server error - Please try again later';
+    technicalDetails = error.message;
+  } else {
+    userMessage = `Error: ${error.message}`;
+  }
+  
+  // Show toast notification
+  ui.showToast(userMessage, 'error');
+  
+  // Log technical details for debugging
+  console.error(`[${context}] ${technicalDetails || error.message}`, error);
+  
+  return userMessage;
+}
+
 // ============ Token Counter & Active Displays ============
 
 function updateTokenCounter() {
@@ -1040,9 +1074,126 @@ function initEventListeners() {
 
 // توابع حذف شده - Key Manager کاملاً حذف شد
 
-function handleMessageClick(e) { const target = e.target; if (target.classList.contains('chip')) { const text = target.dataset.chip; const prompt = document.getElementById('prompt'); prompt.value = text; utils.checkRTL(prompt); prompt.focus(); return; } if (target.classList.contains('msg-cb')) { const idx = parseInt(target.dataset.idx); if (target.checked) state.selectedIndices.add(idx); else state.selectedIndices.delete(idx); updateSelectUI(); return; } const action = target.dataset.action; const idx = parseInt(target.dataset.idx); if (action === 'copy-msg') { const msg = state.chatHistory[idx]; utils.copyToClipboard(msg.content).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Copy failed', 'error')); } else if (action === 'regen-msg') { regenMessage(idx); } else if (action === 'toggle-long') { const bubble = target.closest('.bubble'); bubble.classList.toggle('expanded'); target.textContent = bubble.classList.contains('expanded') ? 'Show less ▲' : 'Show more ▼'; } else if (action === 'download-image') { const msg = state.chatHistory[idx]; const link = document.createElement('a'); link.href = msg.image; link.download = `image-${idx}.png`; link.click(); ui.showToast('Downloaded', 'success'); } else if (action === 'copy-image') { const msg = state.chatHistory[idx]; fetch(msg.image).then(res => res.blob()).then(blob => navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Failed', 'error')); } else if (action === 'open-image') { window.open(target.src, '_blank'); } }
-function handleContextMenu(e) { const msg = e.target.closest('.msg'); if (!msg) return; e.preventDefault(); const idx = parseInt(msg.dataset.idx); const message = state.chatHistory[idx]; const items = [{ icon: '📋', label: 'Copy', action: `copy-msg-${idx}` }, { icon: '✏️', label: 'Edit', action: `edit-msg-${idx}` }]; if (message.role === 'assistant' && idx === state.chatHistory.length - 1) items.push({ icon: '🔄', label: 'Regenerate', action: 'regen-last' }); items.push({ icon: '🗑️', label: 'Delete', action: `delete-msg-${idx}`, danger: true }); const menu = document.getElementById('contextMenu'); menu.innerHTML = items.map(item => `<button class="context-menu-item ${item.danger ? 'danger' : ''}" data-context-action="${item.action}">${item.icon} ${item.label}</button>`).join(''); const menuWidth = 200; const menuHeight = items.length * 40; const maxX = window.innerWidth - menuWidth - 10; const maxY = window.innerHeight - menuHeight - 10; menu.style.left = Math.max(10, Math.min(e.clientX, maxX)) + 'px'; menu.style.top = Math.max(10, Math.min(e.clientY, maxY)) + 'px'; menu.hidden = false; menu.querySelectorAll('.context-menu-item').forEach(item => { item.onclick = () => { handleContextAction(item.dataset.contextAction, idx); menu.hidden = true; }; }); }
-function handleContextAction(action, idx) { if (action === `copy-msg-${idx}`) { utils.copyToClipboard(state.chatHistory[idx].content).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Failed', 'error')); } else if (action === `edit-msg-${idx}`) { const newText = prompt('Edit:', state.chatHistory[idx].content); if (newText !== null && newText.trim()) { state.chatHistory[idx].content = newText.trim(); ui.renderMessages(); ui.showToast('Edited', 'success'); } } else if (action === `delete-msg-${idx}`) { if (!confirm('Delete?')) return; state.chatHistory.splice(idx, 1); ui.renderMessages(); ui.showToast('Deleted', 'info'); } else if (action === 'regen-last') { regenLast(); } }
+function handleMessageClick(e) { 
+  const target = e.target; 
+  if (target.classList.contains('chip')) { 
+    const text = target.dataset.chip; 
+    const prompt = document.getElementById('prompt'); 
+    prompt.value = text; 
+    utils.checkRTL(prompt); 
+    prompt.focus(); 
+    return; 
+  } 
+  if (target.classList.contains('msg-cb')) { 
+    const idx = parseInt(target.dataset.idx); 
+    if (target.checked) state.selectedIndices.add(idx); 
+    else state.selectedIndices.delete(idx); 
+    updateSelectUI(); 
+    return; 
+  } 
+  const action = target.dataset.action; 
+  const idx = parseInt(target.dataset.idx); 
+  if (action === 'copy-msg') { 
+    const msg = state.chatHistory[idx]; 
+    utils.copyToClipboard(msg.content).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Copy failed', 'error')); 
+  } else if (action === 'edit-msg') { 
+    editMessage(idx); 
+  } else if (action === 'regen-msg') { 
+    regenMessage(idx); 
+  } else if (action === 'toggle-long') { 
+    const bubble = target.closest('.bubble'); 
+    bubble.classList.toggle('expanded'); 
+    target.textContent = bubble.classList.contains('expanded') ? 'Show less ▲' : 'Show more ▼'; 
+  } else if (action === 'download-image') { 
+    const msg = state.chatHistory[idx]; 
+    const link = document.createElement('a'); 
+    link.href = msg.image; 
+    link.download = `image-${idx}.png`; 
+    link.click(); 
+    ui.showToast('Downloaded', 'success'); 
+  } else if (action === 'copy-image') { 
+    const msg = state.chatHistory[idx]; 
+    fetch(msg.image).then(res => res.blob()).then(blob => navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Failed', 'error')); 
+  } else if (action === 'open-image') { 
+    window.open(target.src, '_blank'); 
+  } 
+}
+function handleContextMenu(e) { 
+  const msg = e.target.closest('.msg'); 
+  if (!msg) return; 
+  e.preventDefault(); 
+  const idx = parseInt(msg.dataset.idx); 
+  const message = state.chatHistory[idx]; 
+  const items = [
+    { icon: '📋', label: 'Copy', action: `copy-msg-${idx}` }, 
+    { icon: '✏️', label: 'Edit', action: `edit-msg-${idx}` }
+  ]; 
+  if (message.role === 'assistant' && idx === state.chatHistory.length - 1) {
+    items.push({ icon: '🔄', label: 'Regenerate', action: 'regen-last' }); 
+  }
+  items.push({ icon: '🗑️', label: 'Delete', action: `delete-msg-${idx}`, danger: true }); 
+  
+  const menu = document.getElementById('contextMenu'); 
+  menu.innerHTML = items.map(item => `<button class="context-menu-item ${item.danger ? 'danger' : ''}" data-context-action="${item.action}">${item.icon} ${item.label}</button>`).join(''); 
+  const menuWidth = 200; 
+  const menuHeight = items.length * 40; 
+  const maxX = window.innerWidth - menuWidth - 10; 
+  const maxY = window.innerHeight - menuHeight - 10; 
+  menu.style.left = Math.max(10, Math.min(e.clientX, maxX)) + 'px'; 
+  menu.style.top = Math.max(10, Math.min(e.clientY, maxY)) + 'px'; 
+  menu.hidden = false; 
+  menu.querySelectorAll('.context-menu-item').forEach(item => { 
+    item.onclick = () => { 
+      handleContextAction(item.dataset.contextAction, idx); 
+      menu.hidden = true; 
+    }; 
+  }); 
+}
+
+function handleContextAction(action, idx) { 
+  if (action === `copy-msg-${idx}`) { 
+    utils.copyToClipboard(state.chatHistory[idx].content).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Failed', 'error')); 
+  } else if (action === `edit-msg-${idx}`) { 
+    editMessage(idx); 
+  } else if (action === `delete-msg-${idx}`) { 
+    if (!confirm('Delete?')) return; 
+    state.chatHistory.splice(idx, 1); 
+    ui.renderMessages(); 
+    ui.showToast('Deleted', 'info'); 
+  } else if (action === 'regen-last') { 
+    regenLast(); 
+  } 
+}
+
+// Edit Message Function - Allows users to edit their messages and regenerate AI response
+function editMessage(idx) {
+  const msg = state.chatHistory[idx];
+  if (!msg || msg.role !== 'user') {
+    ui.showToast('Only user messages can be edited', 'warning');
+    return;
+  }
+  
+  // Create a modal or use prompt for editing
+  const newText = prompt('Edit your message:', msg.content);
+  if (newText === null || !newText.trim()) return;
+  
+  // Update the message
+  state.chatHistory[idx].content = newText.trim();
+  
+  // Remove all messages after this one (including AI responses)
+  const messagesToRemove = state.chatHistory.length - idx - 1;
+  if (messagesToRemove > 0) {
+    state.chatHistory.splice(idx + 1, messagesToRemove);
+  }
+  
+  ui.renderMessages();
+  ui.showToast('Message edited, regenerating response...', 'info');
+  
+  // Automatically regenerate AI response
+  setTimeout(async () => {
+    await chat.sendMessage(newText.trim());
+  }, 300);
+}
 function handleChatListClick(e) { const deleteBtn = e.target.closest('[data-action="delete-chat"]'); if (deleteBtn) { e.stopPropagation(); const chatId = deleteBtn.dataset.chatId; if (!confirm('Delete?')) return; state.allChats = state.allChats.filter(c => c.id !== chatId); if (state.currentChatId === chatId) { state.chatHistory = []; state.currentChatId = null; state.selectedIndices.clear(); document.getElementById('copyFab').hidden = true; ui.updateChatTitle('Untitled'); ui.renderMessages(); } storage.saveChats(state.allChats); chat.renderChatList(); ui.showToast('Deleted', 'info'); return; } const item = e.target.closest('.chat-history-item'); if (item) openChat(item.dataset.chatId); }
 
 function newChat() { if (state.chatHistory.length > 0) chat.saveCurrentChat(); state.chatHistory = []; state.currentChatId = null; state.lastReq = {}; state.selectedIndices.clear(); state.assistantIndex = -1; document.getElementById('copyFab').hidden = true; ui.updateChatTitle('Untitled'); ui.renderMessages(); chat.renderChatList(); ui.showToast('New chat', 'info'); }

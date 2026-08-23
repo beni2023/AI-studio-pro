@@ -1,11 +1,8 @@
-```
 # Compiled and build artifacts
 *.pyc
 __pycache__/
 *.o
 *.obj
-dist/
-build/
 *.class
 *.exe
 *.dll
@@ -17,10 +14,12 @@ build/
 .venv/
 venv/
 node_modules/
-.mypy_cache/
-.pytest_cache/
+dist/
+build/
 target/
 .gradle/
+.mypy_cache/
+.pytest_cache/
 
 # Logs and temp files
 *.log
@@ -40,8 +39,6 @@ target/
 # System files
 .DS_Store
 Thumbs.db
-
-# Coverage
 coverage/
 htmlcov/
 .coverage
@@ -69,4 +66,3 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
