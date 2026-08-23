@@ -272,23 +272,7 @@ const providerManager = {
     }
   },
   
-  updateKeyCount() {
-    const badge = document.getElementById('kmBadge');
-    if (!badge) return;
-    
-    const totalKeys = this.providers.reduce((sum, p) => sum + (p.keys?.length || 0), 0);
-    const readyCount = this.providers.filter(p => p.keys?.length > 0).length;
-    const missingCount = this.providers.length - readyCount;
-    
-    badge.textContent = totalKeys;
-    badge.className = 'km-badge ' + (totalKeys > 0 ? 'has-keys' : 'no-keys');
-    
-    const readyEl = document.getElementById('kmReadyCount');
-    const missingEl = document.getElementById('kmMissingCount');
-    
-    if (readyEl) readyEl.textContent = `${readyCount} ready`;
-    if (missingEl) missingEl.textContent = `${missingCount} missing`;
-  },
+  // Key Manager حذف شد - این تابع دیگر نیاز نیست
   
   async addProvider(providerData) {
     try {
@@ -845,8 +829,6 @@ async function saveProvider() {
       const pEl = document.getElementById('apProtocol'); if (pEl) pEl.value = 'chat_completions';
       const prEl = document.getElementById('apPreset'); if (prEl) prEl.value = '';
       
-      renderKeyManagerUI();
-      
       const providerSelect = document.getElementById('provider');
       if (providerSelect) {
         providerSelect.value = providerData.id;
@@ -920,39 +902,9 @@ function initEventListeners() {
   
   const refreshModelsBtn = document.getElementById('refreshModelsBtn');
   if (refreshModelsBtn) refreshModelsBtn.addEventListener('click', forceRefreshModels);
-  
-  document.getElementById('openKeyManagerBtn').addEventListener('click', () => { 
-    document.getElementById('keyManagerModal').hidden = false; 
-    renderKeyManagerUI(); 
-  });
-  document.getElementById('closeKeyManagerBtn').addEventListener('click', () => { 
-    document.getElementById('keyManagerModal').hidden = true; 
-  });
-  document.getElementById('kmAddKeyBtn').addEventListener('click', () => {
-    ui.showToast('9Router API key is configured via NINEROUTER_API_KEY environment variable', 'info');
-  });
 }
 
-function renderKeyManagerUI() {
-  const container = document.getElementById('kmKeysList');
-  if (!container) return;
-  
-  // ✅ نمایش پیام ساده - فقط 9router پشتیبانی می‌شود
-  container.innerHTML = '<div class="empty-keys"><div class="empty-keys-icon">🌐</div><div>9Router is the only provider</div><div style="font-size:0.8rem; margin-top:8px;">All models are automatically fetched from 9Router API.</div><div style="font-size:0.75rem; margin-top:4px; color:var(--text-muted);">Make sure NINEROUTER_API_KEY is set in your .env file.</div></div>';
-}
-
-// ✅ توابع حذف شده - 9Router از environment variable استفاده می‌کند
-async function testKeyFromUI(providerId, keyId) {
-  ui.showToast('9Router API key is configured via environment variable. Check NINEROUTER_API_KEY in your .env file.', 'info');
-}
-
-async function deleteKeyFromUI(providerId, keyId) {
-  ui.showToast('Cannot delete keys - 9Router uses environment variable NINEROUTER_API_KEY', 'warning');
-}
-
-async function deleteProviderFromUI(providerId) {
-  ui.showToast('Cannot delete 9Router - it is the only supported provider', 'warning');
-}
+// توابع حذف شده - Key Manager کاملاً حذف شد
 
 function handleMessageClick(e) { const target = e.target; if (target.classList.contains('chip')) { const text = target.dataset.chip; const prompt = document.getElementById('prompt'); prompt.value = text; utils.checkRTL(prompt); prompt.focus(); return; } if (target.classList.contains('msg-cb')) { const idx = parseInt(target.dataset.idx); if (target.checked) state.selectedIndices.add(idx); else state.selectedIndices.delete(idx); updateSelectUI(); return; } const action = target.dataset.action; const idx = parseInt(target.dataset.idx); if (action === 'copy-msg') { const msg = state.chatHistory[idx]; utils.copyToClipboard(msg.content).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Copy failed', 'error')); } else if (action === 'toggle-long') { const bubble = target.closest('.bubble'); bubble.classList.toggle('expanded'); target.textContent = bubble.classList.contains('expanded') ? 'Show less ▲' : 'Show more ▼'; } else if (action === 'download-image') { const msg = state.chatHistory[idx]; const link = document.createElement('a'); link.href = msg.image; link.download = `image-${idx}.png`; link.click(); ui.showToast('Downloaded', 'success'); } else if (action === 'copy-image') { const msg = state.chatHistory[idx]; fetch(msg.image).then(res => res.blob()).then(blob => navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])).then(() => ui.showToast('Copied', 'success')).catch(() => ui.showToast('Failed', 'error')); } else if (action === 'open-image') { window.open(target.src, '_blank'); } }
 function handleContextMenu(e) { const msg = e.target.closest('.msg'); if (!msg) return; e.preventDefault(); const idx = parseInt(msg.dataset.idx); const message = state.chatHistory[idx]; const items = [{ icon: '📋', label: 'Copy', action: `copy-msg-${idx}` }, { icon: '✏️', label: 'Edit', action: `edit-msg-${idx}` }]; if (message.role === 'assistant' && idx === state.chatHistory.length - 1) items.push({ icon: '🔄', label: 'Regenerate', action: 'regen-last' }); items.push({ icon: '🗑️', label: 'Delete', action: `delete-msg-${idx}`, danger: true }); const menu = document.getElementById('contextMenu'); menu.innerHTML = items.map(item => `<button class="context-menu-item ${item.danger ? 'danger' : ''}" data-context-action="${item.action}">${item.icon} ${item.label}</button>`).join(''); const menuWidth = 200; const menuHeight = items.length * 40; const maxX = window.innerWidth - menuWidth - 10; const maxY = window.innerHeight - menuHeight - 10; menu.style.left = Math.max(10, Math.min(e.clientX, maxX)) + 'px'; menu.style.top = Math.max(10, Math.min(e.clientY, maxY)) + 'px'; menu.hidden = false; menu.querySelectorAll('.context-menu-item').forEach(item => { item.onclick = () => { handleContextAction(item.dataset.contextAction, idx); menu.hidden = true; }; }); }
