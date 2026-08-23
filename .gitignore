@@ -7,10 +7,10 @@ __pycache__/
 dist/
 build/
 *.class
+*.exe
+*.dll
 *.so
 *.a
-*.dll
-*.exe
 *.out
 
 # Dependencies
@@ -31,7 +31,7 @@ target/
 # Environment
 .env
 .env.local
-.env.*
+*.env.*
 
 # Editors
 .vscode/
