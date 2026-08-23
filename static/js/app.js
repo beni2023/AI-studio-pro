@@ -8,6 +8,7 @@ const state = {
   selectedIndices: new Set(), currentImage: null, uploadedFileData: null,
   currentCommandIndex: 0, searchDebounceTimer: null,
   activeToasts: [], MAX_TOASTS: 4, modelsLoaded: false, assistantIndex: -1,
+  selectedText: '', quoteBoxVisible: false,
   COMMANDS: [
     { name: 'New Chat', icon: '✨', shortcut: 'Ctrl+N', action: 'newChat' },
     { name: 'Search', icon: '🔍', shortcut: 'Ctrl+F', action: 'focusSearch' },
@@ -369,7 +370,15 @@ const chat = {
   async sendMessage(textOverride = null, imageOverride = null) {
     if (state.isStreaming) { ui.showToast('Please wait', 'warning'); return; }
     const input = document.getElementById('prompt');
-    const text = textOverride !== null ? textOverride : input.value.trim();
+    let text = textOverride !== null ? textOverride : input.value.trim();
+    
+    // Add quoted text if exists
+    if (state.selectedText && state.quoteBoxVisible) {
+      const quotedText = `Quoting: "${state.selectedText}"\n\n${text}`;
+      text = quotedText;
+      clearQuoteBox();
+    }
+    
     if (!text && !state.currentImage && !imageOverride) { ui.showToast('Enter a message', 'warning'); return; }
     
     const provider = providerManager.getCurrentProvider();
@@ -1001,6 +1010,9 @@ function initEventListeners() {
   document.getElementById('messages').addEventListener('contextmenu', handleContextMenu);
   document.getElementById('chatHistoryList').addEventListener('click', handleChatListClick);
   
+  // Reply to Selection - mouseup event
+  document.getElementById('messages').addEventListener('mouseup', handleTextSelection);
+  
   const refreshModelsBtn = document.getElementById('refreshModelsBtn');
   if (refreshModelsBtn) refreshModelsBtn.addEventListener('click', forceRefreshModels);
   
@@ -1134,3 +1146,75 @@ const keyboard = {
     });
   }
 };
+// Reply to Selection functions
+function handleTextSelection(e) {
+  const selection = window.getSelection();
+  const selectedText = selection.toString().trim();
+  
+  // Remove existing toolbar
+  const existingToolbar = document.querySelector('.selection-toolbar');
+  if (existingToolbar) existingToolbar.remove();
+  
+  if (!selectedText || state.selectMode) return;
+  
+  state.selectedText = selectedText;
+  
+  // Get selection range and position
+  const range = selection.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  
+  // Create floating toolbar
+  const toolbar = document.createElement('div');
+  toolbar.className = 'selection-toolbar';
+  toolbar.innerHTML = '<button class="selection-toolbar-btn">💬 Reply</button>';
+  toolbar.style.left = `${rect.left + (rect.width / 2) - 50}px`;
+  toolbar.style.top = `${rect.top - 40}px`;
+  
+  toolbar.addEventListener('click', () => {
+    showQuoteBox(selectedText);
+    toolbar.remove();
+  });
+  
+  document.body.appendChild(toolbar);
+  
+  // Remove toolbar when clicking elsewhere
+  setTimeout(() => {
+    document.addEventListener('click', function removeToolbar(event) {
+      if (!toolbar.contains(event.target) && !selection.anchorNode.parentNode.closest('.bubble')) {
+        toolbar.remove();
+        document.removeEventListener('click', removeToolbar);
+      }
+    });
+  }, 100);
+}
+
+function showQuoteBox(text) {
+  const inputArea = document.getElementById('inputArea');
+  const existingQuote = document.querySelector('.quote-box');
+  if (existingQuote) existingQuote.remove();
+  
+  const quoteBox = document.createElement('div');
+  quoteBox.className = 'quote-box';
+  quoteBox.innerHTML = `
+    <div class="quote-content">
+      <div class="quote-label">Replying to:</div>
+      <div class="quote-text">${utils.escapeHtml(text)}</div>
+    </div>
+    <button class="quote-close" title="Cancel reply">✕</button>
+  `;
+  
+  quoteBox.querySelector('.quote-close').addEventListener('click', clearQuoteBox);
+  
+  inputArea.insertBefore(quoteBox, inputArea.firstChild);
+  state.quoteBoxVisible = true;
+  
+  // Focus on input
+  document.getElementById('prompt').focus();
+}
+
+function clearQuoteBox() {
+  const existingQuote = document.querySelector('.quote-box');
+  if (existingQuote) existingQuote.remove();
+  state.selectedText = '';
+  state.quoteBoxVisible = false;
+}
