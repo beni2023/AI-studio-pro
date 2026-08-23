@@ -83,33 +83,6 @@
   </div>
 </section>
   
-  <!-- API Key Manager -->
-  <section class="sidebar-section">
-    <h3 class="section-title">🔑 API Keys</h3>
-    
-    <!-- Hidden field for active key -->
-    <input type="hidden" id="apiKey" value="">
-    
-    <!-- Manage Button -->
-    <button class="btn btn-full km-manage-btn" id="openKeyManagerBtn">
-      <span class="km-icon">🔑</span>
-      <span class="km-text">Manage API Keys</span>
-      <span class="km-badge" id="kmBadge">0</span>
-    </button>
-    
-    <!-- Status Summary -->
-    <div class="km-status-summary" id="kmStatusSummary">
-      <div class="km-status-item">
-        <span class="km-status-icon">✅</span>
-        <span class="km-status-text" id="kmReadyCount">0 ready</span>
-      </div>
-      <div class="km-status-item">
-        <span class="km-status-icon">⚠️</span>
-        <span class="km-status-text" id="kmMissingCount">0 missing</span>
-      </div>
-    </div>
-  </section>
-  
   <!-- Theme -->
   <section class="sidebar-section">
     <h3 class="section-title">🎨 Theme</h3>
@@ -216,8 +189,6 @@
 
 <!-- ============ MODALS ============ -->
 
-<!-- Add Key Modal - Removed (9Router uses environment variable) -->
-
 <!-- Copy Preview Modal -->
 <div class="modal-overlay" id="copyModal" hidden>
   <div class="modal">
@@ -229,30 +200,6 @@
     </div>
   </div>
 </div>
-
-<!-- Key Manager Modal -->
-<div class="modal-overlay" id="keyManagerModal" hidden>
-  <div class="modal" style="max-width:600px; max-height:85vh;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-      <h3 class="modal-title" style="margin:0;">🔑 API Keys Manager</h3>
-      <button class="btn" id="closeKeyManagerBtn" style="padding:4px 8px;">✕</button>
-    </div>
-    
-    <!-- Toolbar -->
-    <div style="display:flex; gap:8px; margin-bottom:16px;">
-      <button class="btn btn-primary" id="kmAddKeyBtn" style="flex:1;" title="API key is configured via NINEROUTER_API_KEY environment variable">ℹ️ 9Router Info</button>
-    </div>
-    
-    <!-- Keys List -->
-    <div id="kmKeysList" style="max-height:400px; overflow-y:auto;">
-      <div class="empty-keys">
-        <div class="empty-keys-icon">🔑</div>
-        <div>Loading...</div>
-      </div>
-    </div>
-  </div>
-</div>
-
 
 <!-- Command Palette -->
 <div class="command-palette-overlay" id="commandPalette" hidden>
