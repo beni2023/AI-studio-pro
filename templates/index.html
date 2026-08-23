@@ -52,10 +52,25 @@
   <select class="form-select" id="provider">
     <option value="">No Providers - Add one first</option>
   </select>
+  
+  <!-- Model Category Filter -->
+  <label class="form-label">Category Filter</label>
+  <div class="model-category-filter" id="modelCategoryFilter">
+    <button class="category-btn active" data-category="all">All</button>
+    <button class="category-btn" data-category="coding">💻 Coding</button>
+    <button class="category-btn" data-category="vision">👁️ Vision</button>
+    <button class="category-btn" data-category="chat">💬 Chat</button>
+    <button class="category-btn" data-category="analysis">📊 Analysis</button>
+  </div>
+  
   <label class="form-label">Model</label>
   <div style="display:flex; gap:4px;">
     <select class="form-select" id="model" style="flex:1;"></select>
     <button class="btn" id="refreshModelsBtn" title="Refresh models" style="padding:8px;">🔄</button>
+  </div>
+  <div class="model-recommendation" id="modelRecommendation" hidden>
+    <span class="recommendation-icon">✨</span>
+    <span class="recommendation-text"></span>
   </div>
   
   <!-- Provider Status Card -->
