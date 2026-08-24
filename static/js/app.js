@@ -622,7 +622,8 @@ function getModelStatusDot(status) {
     case 'gone': 
     case 'not_found': return '🔴';
     case 'warning': 
-    case 'error': return '🟠';
+    case 'error': 
+    case 'server_error': return '🟠';
     default: return '⚪';
   }
 }
@@ -630,7 +631,7 @@ function getModelStatusDot(status) {
 async function selectModel(modelId, modelName) {
   currentModel = modelId;
   
-  // 1. Change status to "checking" (yellow)
+  // 1. Change status to "checking" (yellow) immediately
   updateModelStatusInList(modelId, 'checking');
   
   // Save to settings
@@ -642,17 +643,10 @@ async function selectModel(modelId, modelName) {
     modelSelect.value = modelId;
   }
 
-  // 2. Perform health check in background
-  const healthStatus = await checkModelHealth(modelId);
+  // 2. Use ModelHealthChecker for intelligent health checking with caching and queueing
+  const healthStatus = await ModelHealthChecker.checkHealth(modelId, modelName);
   
-  // 3. Update final status based on result
-  updateModelStatusInList(modelId, healthStatus);
-
-  if (healthStatus === 'gone' || healthStatus === 'not_found') {
-    ui.showToast(`مدل "${modelName}" دیگر در دسترس نیست`, 'error');
-  } else if (healthStatus !== 'healthy') {
-    ui.showToast(`وضعیت مدل "${modelName}" نامشخص است`, 'warning');
-  }
+  // Note: The status is already updated by ModelHealthChecker internally
 }
 
 function updateModelStatusInList(modelId, status) {
@@ -676,10 +670,32 @@ function renderModels(models) {
     return;
   }
   
+  // Load cached health statuses
+  const cachedStatuses = new Map();
+  models.forEach(m => {
+    const cached = ModelHealthChecker.getCachedHealth(m.id);
+    if (cached) cachedStatuses.set(m.id, cached);
+  });
+  
   sel.innerHTML = models.map(m => {
     const isActive = m.status === 'active' || !m.status;
-    const statusDot = isActive ? '🟢' : '🔴';
-    return `<option value="${utils.escapeHtml(m.id)}" data-status="${isActive ? 'active' : 'inactive'}">${statusDot} ${utils.escapeHtml(m.name)}</option>`;
+    const cachedStatus = cachedStatuses.get(m.id);
+    let statusDot = '⚪';
+    let finalStatus = 'unknown';
+    
+    if (cachedStatus) {
+      // Use cached status
+      statusDot = getModelStatusDot(cachedStatus);
+      finalStatus = cachedStatus;
+    } else if (isActive) {
+      statusDot = '🟢';
+      finalStatus = 'healthy';
+    } else {
+      statusDot = '🔴';
+      finalStatus = 'inactive';
+    }
+    
+    return `<option value="${utils.escapeHtml(m.id)}" data-status="${finalStatus}">${statusDot} ${utils.escapeHtml(m.name)}</option>`;
   }).join('');
   
   if (!sel.value && models.length > 0) {
@@ -817,7 +833,7 @@ function updateTokenCounter() {
 
 // ============ Enhanced Toast ============
 
-function showToastEnhanced(message, type = 'info') {
+function showToastEnhanced(message, type = 'info', duration = 3000) {
   const container = document.getElementById('toastContainer');
   while (state.activeToasts.length >= state.MAX_TOASTS) {
     const oldest = state.activeToasts.shift();
@@ -826,7 +842,7 @@ function showToastEnhanced(message, type = 'info') {
   
   const toastEl = document.createElement('div');
   toastEl.className = `toast ${type}`;
-  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️', checking: '🟡' };
   
   toastEl.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span class="toast-content">${message}</span><button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
   
@@ -834,15 +850,188 @@ function showToastEnhanced(message, type = 'info') {
   state.activeToasts.push(toastEl);
   
   setTimeout(() => toastEl.classList.add('show'), 10);
-  setTimeout(() => {
-    toastEl.classList.remove('show');
+  
+  // Auto-dismiss after duration (unless it's a critical error)
+  if (duration > 0) {
     setTimeout(() => {
-      if (toastEl.parentNode) toastEl.remove();
-      const idx = state.activeToasts.indexOf(toastEl);
-      if (idx > -1) state.activeToasts.splice(idx, 1);
-    }, 300);
-  }, 3000);
+      toastEl.classList.remove('show');
+      setTimeout(() => {
+        if (toastEl.parentNode) toastEl.remove();
+        const idx = state.activeToasts.indexOf(toastEl);
+        if (idx > -1) state.activeToasts.splice(idx, 1);
+      }, 300);
+    }, duration);
+  }
 }
+
+// ============ Model Health Checker Module ============
+
+const ModelHealthChecker = {
+  cache: new Map(),
+  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+  queue: [],
+  isProcessing: false,
+  currentAbortController: null,
+  
+  // Check if cached result is still valid
+  getCachedHealth(modelId) {
+    const cached = this.cache.get(modelId);
+    if (!cached) return null;
+    
+    const now = Date.now();
+    if (now - cached.timestamp > this.CACHE_DURATION) {
+      this.cache.delete(modelId);
+      return null;
+    }
+    return cached.status;
+  },
+  
+  // Cache health status
+  cacheHealth(modelId, status) {
+    this.cache.set(modelId, {
+      status: status,
+      timestamp: Date.now()
+    });
+  },
+  
+  // Add to queue and process
+  async checkHealth(modelId, modelName) {
+    // Cancel previous pending checks
+    if (this.currentAbortController) {
+      this.currentAbortController.abort();
+    }
+    
+    // Clear queue and add only the latest request
+    this.queue = [{ modelId, modelName }];
+    
+    return await this.processQueue();
+  },
+  
+  async processQueue() {
+    if (this.isProcessing || this.queue.length === 0) return;
+    
+    this.isProcessing = true;
+    const { modelId, modelName } = this.queue.shift();
+    
+    // Check cache first
+    const cachedStatus = this.getCachedHealth(modelId);
+    if (cachedStatus) {
+      console.log(`📦 Using cached health status for ${modelId}: ${cachedStatus}`);
+      updateModelStatusInList(modelId, cachedStatus);
+      this.isProcessing = false;
+      return cachedStatus;
+    }
+    
+    // Show "checking" toast
+    showToastEnhanced(`در حال بررسی وضعیت مدل "${modelName}"...`, 'checking', 0);
+    
+    // Create new abort controller for this request
+    this.currentAbortController = new AbortController();
+    
+    try {
+      const healthStatus = await this.performHealthCheck(modelId, this.currentAbortController.signal);
+      
+      // Cache the result
+      this.cacheHealth(modelId, healthStatus);
+      
+      // Update UI
+      updateModelStatusInList(modelId, healthStatus);
+      
+      // Close checking toast
+      const checkingToast = state.activeToasts.find(t => t.classList.contains('checking'));
+      if (checkingToast) {
+        checkingToast.remove();
+        const idx = state.activeToasts.indexOf(checkingToast);
+        if (idx > -1) state.activeToasts.splice(idx, 1);
+      }
+      
+      // Show result toast
+      this.showHealthResult(healthStatus, modelName);
+      
+      this.isProcessing = false;
+      return healthStatus;
+      
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Health check aborted');
+        this.isProcessing = false;
+        return 'aborted';
+      }
+      
+      console.error('Health check failed:', error);
+      updateModelStatusInList(modelId, 'error');
+      
+      const checkingToast = state.activeToasts.find(t => t.classList.contains('checking'));
+      if (checkingToast) {
+        checkingToast.remove();
+        const idx = state.activeToasts.indexOf(checkingToast);
+        if (idx > -1) state.activeToasts.splice(idx, 1);
+      }
+      
+      showToastEnhanced(`خطا در بررسی مدل "${modelName}"`, 'error', 5000);
+      this.isProcessing = false;
+      return 'error';
+    }
+  },
+  
+  async performHealthCheck(modelId, signal) {
+    const apiKey = document.getElementById('api-key').value.trim();
+    if (!apiKey || !modelId) return 'unknown';
+    
+    try {
+      // Send lightweight test request
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.href,
+          'X-Title': 'AI Chat App'
+        },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [{ role: 'user', content: '.' }], // Empty message for testing
+          max_tokens: 1 // Minimum cost
+        }),
+        signal
+      });
+      
+      if (response.ok) return 'healthy';
+      if (response.status === 410) return 'gone'; // Model expired/deprecated
+      if (response.status === 404) return 'not_found'; // Model not found
+      if (response.status >= 500) return 'server_error'; // Server error
+      return 'warning'; // Other errors
+      
+    } catch (error) {
+      if (error.name === 'AbortError') throw error;
+      console.warn(`Health check failed for ${modelId}:`, error);
+      return 'error';
+    }
+  },
+  
+  showHealthResult(status, modelName) {
+    switch(status) {
+      case 'healthy':
+        showToastEnhanced(`مدل "${modelName}" سالم و آماده است ✅`, 'success', 3000);
+        break;
+      case 'gone':
+        showToastEnhanced(`مدل "${modelName}" دیگر در دسترس نیست (منقضی شده)`, 'error', 8000);
+        break;
+      case 'not_found':
+        showToastEnhanced(`مدل "${modelName}" یافت نشد`, 'error', 5000);
+        break;
+      case 'server_error':
+        showToastEnhanced(`خطای سرور در بررسی مدل "${modelName}"`, 'error', 5000);
+        break;
+      case 'warning':
+        showToastEnhanced(`وضعیت مدل "${modelName}" نامشخص است`, 'warning', 5000);
+        break;
+      case 'error':
+        showToastEnhanced(`خطا در ارتباط با سرور برای مدل "${modelName}"`, 'error', 5000);
+        break;
+    }
+  }
+};
 
 // ============ Preset Data & Apply ============
 
