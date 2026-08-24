@@ -622,7 +622,8 @@ function getModelStatusDot(status) {
     case 'gone': 
     case 'not_found': return '🔴';
     case 'warning': 
-    case 'error': return '🟠';
+    case 'error': 
+    case 'server_error': return '🟠';
     default: return '⚪';
   }
 }
@@ -630,7 +631,7 @@ function getModelStatusDot(status) {
 async function selectModel(modelId, modelName) {
   currentModel = modelId;
   
-  // 1. Change status to "checking" (yellow)
+  // 1. Change status to "checking" (yellow) immediately
   updateModelStatusInList(modelId, 'checking');
   
   // Save to settings
@@ -642,17 +643,10 @@ async function selectModel(modelId, modelName) {
     modelSelect.value = modelId;
   }
 
-  // 2. Perform health check in background
-  const healthStatus = await checkModelHealth(modelId);
+  // 2. Use ModelHealthChecker for intelligent health checking with caching and queueing
+  const healthStatus = await ModelHealthChecker.checkHealth(modelId, modelName);
   
-  // 3. Update final status based on result
-  updateModelStatusInList(modelId, healthStatus);
-
-  if (healthStatus === 'gone' || healthStatus === 'not_found') {
-    ui.showToast(`مدل "${modelName}" دیگر در دسترس نیست`, 'error');
-  } else if (healthStatus !== 'healthy') {
-    ui.showToast(`وضعیت مدل "${modelName}" نامشخص است`, 'warning');
-  }
+  // Note: The status is already updated by ModelHealthChecker internally
 }
 
 function updateModelStatusInList(modelId, status) {
@@ -676,10 +670,14 @@ function renderModels(models) {
     return;
   }
   
+  // همه مدل‌ها در ابتدا خاکستری (unknown) هستند تا زمانی که بررسی شوند
   sel.innerHTML = models.map(m => {
     const isActive = m.status === 'active' || !m.status;
-    const statusDot = isActive ? '🟢' : '🔴';
-    return `<option value="${utils.escapeHtml(m.id)}" data-status="${isActive ? 'active' : 'inactive'}">${statusDot} ${utils.escapeHtml(m.name)}</option>`;
+    // همیشه با چراغ خاکستری شروع می‌شود
+    const statusDot = '⚪';
+    const finalStatus = 'unknown';
+    
+    return `<option value="${utils.escapeHtml(m.id)}" data-status="${finalStatus}">${statusDot} ${utils.escapeHtml(m.name)}</option>`;
   }).join('');
   
   if (!sel.value && models.length > 0) {
@@ -817,7 +815,7 @@ function updateTokenCounter() {
 
 // ============ Enhanced Toast ============
 
-function showToastEnhanced(message, type = 'info') {
+function showToastEnhanced(message, type = 'info', duration = 3000) {
   const container = document.getElementById('toastContainer');
   while (state.activeToasts.length >= state.MAX_TOASTS) {
     const oldest = state.activeToasts.shift();
@@ -826,7 +824,7 @@ function showToastEnhanced(message, type = 'info') {
   
   const toastEl = document.createElement('div');
   toastEl.className = `toast ${type}`;
-  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️', checking: '🟡' };
   
   toastEl.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span class="toast-content">${message}</span><button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
   
@@ -834,15 +832,320 @@ function showToastEnhanced(message, type = 'info') {
   state.activeToasts.push(toastEl);
   
   setTimeout(() => toastEl.classList.add('show'), 10);
-  setTimeout(() => {
-    toastEl.classList.remove('show');
+  
+  // Auto-dismiss after duration (unless it's a critical error)
+  if (duration > 0) {
     setTimeout(() => {
-      if (toastEl.parentNode) toastEl.remove();
-      const idx = state.activeToasts.indexOf(toastEl);
-      if (idx > -1) state.activeToasts.splice(idx, 1);
-    }, 300);
-  }, 3000);
+      toastEl.classList.remove('show');
+      setTimeout(() => {
+        if (toastEl.parentNode) toastEl.remove();
+        const idx = state.activeToasts.indexOf(toastEl);
+        if (idx > -1) state.activeToasts.splice(idx, 1);
+      }, 300);
+    }, duration);
+  }
 }
+
+// ============ Model Health Checker Module ============
+
+const ModelHealthChecker = {
+  cache: new Map(),
+  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+  queue: [],
+  isProcessing: false,
+  currentAbortController: null,
+  HEALTH_TIMEOUT: 30000, // 30 seconds timeout
+  
+  // Check if cached result is still valid
+  getCachedHealth(modelId) {
+    const cached = this.cache.get(modelId);
+    if (!cached) return null;
+    
+    const now = Date.now();
+    if (now - cached.timestamp > this.CACHE_DURATION) {
+      this.cache.delete(modelId);
+      return null;
+    }
+    return cached.status;
+  },
+  
+  // Cache health status in memory and localStorage
+  cacheHealth(modelId, status) {
+    this.cache.set(modelId, {
+      status: status,
+      timestamp: Date.now()
+    });
+    
+    // Also save to localStorage for persistence
+    try {
+      const storageKey = `model_health_${modelId}`;
+      localStorage.setItem(storageKey, JSON.stringify({
+        status: status,
+        timestamp: Date.now()
+      }));
+    } catch (e) {
+      console.warn('Failed to save to localStorage:', e);
+    }
+  },
+  
+  // Get cached health from localStorage
+  getLocalStorageHealth(modelId) {
+    try {
+      const storageKey = `model_health_${modelId}`;
+      const data = localStorage.getItem(storageKey);
+      if (!data) return null;
+      
+      const parsed = JSON.parse(data);
+      const now = Date.now();
+      if (now - parsed.timestamp > this.CACHE_DURATION) {
+        localStorage.removeItem(storageKey);
+        return null;
+      }
+      return parsed.status;
+    } catch (e) {
+      return null;
+    }
+  },
+  
+  // Add to queue and process
+  async checkHealth(modelId, modelName, providerId = null) {
+    // Cancel previous pending checks
+    if (this.currentAbortController) {
+      this.currentAbortController.abort();
+    }
+    
+    // Clear queue and add only the latest request
+    this.queue = [{ modelId, modelName, providerId }];
+    
+    return await this.processQueue();
+  },
+  
+  async processQueue() {
+    if (this.isProcessing || this.queue.length === 0) return 'unknown';
+    
+    this.isProcessing = true;
+    const { modelId, modelName, providerId } = this.queue.shift();
+    
+    // Check cache first (memory and localStorage)
+    let cachedStatus = this.getCachedHealth(modelId);
+    if (!cachedStatus) {
+      cachedStatus = this.getLocalStorageHealth(modelId);
+    }
+    
+    if (cachedStatus) {
+      console.log(`📦 Using cached health status for ${modelId}: ${cachedStatus}`);
+      updateModelStatusInList(modelId, cachedStatus);
+      this.isProcessing = false;
+      return cachedStatus;
+    }
+    
+    // Show "checking" toast with loading indicator
+    showToastEnhanced(`در حال بررسی وضعیت مدل "${modelName}"...`, 'checking', 0);
+    
+    // Create new abort controller for this request
+    this.currentAbortController = new AbortController();
+    
+    // Set up timeout
+    const timeoutId = setTimeout(() => {
+      if (this.currentAbortController) {
+        this.currentAbortController.abort();
+      }
+    }, this.HEALTH_TIMEOUT);
+    
+    try {
+      const healthStatus = await this.performHealthCheck(modelId, this.currentAbortController.signal, providerId);
+      
+      clearTimeout(timeoutId);
+      
+      // Cache the result
+      this.cacheHealth(modelId, healthStatus);
+      
+      // Update UI
+      updateModelStatusInList(modelId, healthStatus);
+      
+      // Close checking toast
+      const checkingToast = state.activeToasts.find(t => t.classList.contains('checking'));
+      if (checkingToast) {
+        checkingToast.remove();
+        const idx = state.activeToasts.indexOf(checkingToast);
+        if (idx > -1) state.activeToasts.splice(idx, 1);
+      }
+      
+      // Show result toast
+      this.showHealthResult(healthStatus, modelName);
+      
+      this.isProcessing = false;
+      return healthStatus;
+      
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        console.log('Health check aborted or timed out');
+        updateModelStatusInList(modelId, 'timeout');
+        
+        const checkingToast = state.activeToasts.find(t => t.classList.contains('checking'));
+        if (checkingToast) {
+          checkingToast.remove();
+          const idx = state.activeToasts.indexOf(checkingToast);
+          if (idx > -1) state.activeToasts.splice(idx, 1);
+        }
+        
+        showToastEnhanced(`زمان بررسی مدل "${modelName}" به پایان رسید (۳۰ ثانیه)`, 'error', 5000);
+        this.isProcessing = false;
+        return 'timeout';
+      }
+      
+      console.error('Health check failed:', error);
+      updateModelStatusInList(modelId, 'error');
+      
+      const checkingToast = state.activeToasts.find(t => t.classList.contains('checking'));
+      if (checkingToast) {
+        checkingToast.remove();
+        const idx = state.activeToasts.indexOf(checkingToast);
+        if (idx > -1) state.activeToasts.splice(idx, 1);
+      }
+      
+      showToastEnhanced(`خطا در بررسی مدل "${modelName}"`, 'error', 5000);
+      this.isProcessing = false;
+      return 'error';
+    }
+  },
+  
+  async performHealthCheck(modelId, signal, providerId = null) {
+    if (!modelId) return 'unknown';
+    
+    // Try to get API key from multiple sources
+    let apiKey = '';
+    
+    // Source 1: Hidden input field (if exists)
+    const apiKeyInput = document.getElementById('api-key');
+    if (apiKeyInput) {
+      apiKey = apiKeyInput.value.trim();
+    }
+    
+    // Source 2: Provider manager's active key
+    if (!apiKey && providerManager && providerManager.getCurrentProvider) {
+      const provider = providerManager.getCurrentProvider();
+      if (provider && provider.keys && provider.keys.length > 0) {
+        const activeKey = provider.keys.find(k => k.is_default && k.enabled) || 
+                         provider.keys.find(k => k.enabled) || 
+                         provider.keys[0];
+        if (activeKey && activeKey.api_key) {
+          apiKey = activeKey.api_key;
+        }
+      }
+    }
+    
+    // Source 3: From localStorage
+    if (!apiKey) {
+      const storedKey = localStorage.getItem('last_api_key');
+      if (storedKey) {
+        apiKey = storedKey;
+      }
+    }
+    
+    if (!apiKey) {
+      console.warn('No API key found for health check');
+      return 'no_key'; // Special status for missing key
+    }
+    
+    try {
+      // Use backend endpoint for health check instead of direct API call
+      const response = await fetch('/api/health/check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: modelId,
+          api_key: apiKey,
+          provider_id: providerId
+        }),
+        signal
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.status || 'healthy';
+      }
+      
+      if (response.status === 410) return 'gone'; // Model expired/deprecated
+      if (response.status === 404) return 'not_found'; // Model not found
+      if (response.status === 401) return 'auth_error'; // Authentication error
+      if (response.status >= 500) return 'server_error'; // Server error
+      return 'warning'; // Other errors
+      
+    } catch (error) {
+      if (error.name === 'AbortError') throw error;
+      
+      // Fallback: Try direct OpenRouter API call
+      console.warn('Backend health check failed, trying direct API call:', error);
+      
+      try {
+        const directResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.href,
+            'X-Title': 'AI Chat App'
+          },
+          body: JSON.stringify({
+            model: modelId,
+            messages: [{ role: 'user', content: '.' }], // Empty message for testing
+            max_tokens: 1 // Minimum cost
+          }),
+          signal
+        });
+        
+        if (directResponse.ok) return 'healthy';
+        if (directResponse.status === 410) return 'gone';
+        if (directResponse.status === 404) return 'not_found';
+        if (directResponse.status === 401) return 'auth_error';
+        if (directResponse.status >= 500) return 'server_error';
+        return 'warning';
+        
+      } catch (fallbackError) {
+        if (fallbackError.name === 'AbortError') throw fallbackError;
+        console.warn(`Direct health check also failed for ${modelId}:`, fallbackError);
+        return 'error';
+      }
+    }
+  },
+  
+  showHealthResult(status, modelName) {
+    switch(status) {
+      case 'healthy':
+        showToastEnhanced(`مدل "${modelName}" سالم و آماده است ✅`, 'success', 3000);
+        break;
+      case 'gone':
+        showToastEnhanced(`مدل "${modelName}" دیگر در دسترس نیست (منقضی شده)`, 'error', 8000);
+        break;
+      case 'not_found':
+        showToastEnhanced(`مدل "${modelName}" یافت نشد`, 'error', 5000);
+        break;
+      case 'server_error':
+        showToastEnhanced(`خطای سرور در بررسی مدل "${modelName}"`, 'error', 5000);
+        break;
+      case 'auth_error':
+        showToastEnhanced(`خطای احراز هویت - کلید API نامعتبر است`, 'error', 8000);
+        break;
+      case 'no_key':
+        showToastEnhanced(`کلید API برای بررسی مدل یافت نشد`, 'warning', 5000);
+        break;
+      case 'timeout':
+        showToastEnhanced(`بررسی مدل "${modelName}" بیش از حد طول کشید`, 'error', 5000);
+        break;
+      case 'warning':
+        showToastEnhanced(`وضعیت مدل "${modelName}" نامشخص است`, 'warning', 5000);
+        break;
+      case 'error':
+        showToastEnhanced(`خطا در ارتباط با سرور برای مدل "${modelName}"`, 'error', 5000);
+        break;
+    }
+  }
+};
 
 // ============ Preset Data & Apply ============
 
