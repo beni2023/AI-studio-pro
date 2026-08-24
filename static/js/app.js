@@ -247,9 +247,6 @@ const providerManager = {
     } else if (this.providers.length > 0) {
       providerSelect.value = this.providers[0].id;
     }
-    
-    updateActiveProviderDisplay();
-    updateProviderStatusCard();
   },
   
   getCurrentProvider() {
@@ -573,8 +570,6 @@ async function loadModels() {
       renderModels(models);
       state.modelsLoaded = true;
       ui.updateModelInfo(sel.value);
-      updateActiveModelDisplay();
-      updateProviderStatusCard();
     } else {
       sel.innerHTML = '<option value="" disabled>⚠️ No models - Add API key first</option>';
       ui.showToast('No models available', 'warning');
@@ -596,10 +591,12 @@ function renderModels(models) {
   }
   
   sel.innerHTML = models.map(m => {
-    return `<option value="${utils.escapeHtml(m.id)}">${utils.escapeHtml(m.name)}</option>`;
+    const isActive = m.status === 'active' || !m.status;
+    const statusClass = isActive ? 'status-active' : 'status-inactive';
+    const statusDot = isActive ? '🟢' : '🔴';
+    return `<option value="${utils.escapeHtml(m.id)}" data-status="${isActive ? 'active' : 'inactive'}">${statusDot} ${utils.escapeHtml(m.name)}</option>`;
   }).join('');
   
-  // Select first model if none selected
   if (!sel.value && models.length > 0) {
     sel.selectedIndex = 0;
   }
@@ -626,8 +623,6 @@ async function forceRefreshModels() {
       renderModels(models);
       state.modelsLoaded = true;
       ui.updateModelInfo(sel.value);
-      updateActiveModelDisplay();
-      updateProviderStatusCard();
       ui.showToast(`Loaded ${models.length} models`, 'success');
     } else {
       sel.innerHTML = '<option value="" disabled>⚠️ No models available</option>';
@@ -733,53 +728,6 @@ function updateTokenCounter() {
   counter.classList.remove('warning', 'danger');
   if (estimatedTokens > 3000) counter.classList.add('danger');
   else if (estimatedTokens > 2000) counter.classList.add('warning');
-}
-
-function updateActiveModelDisplay() {
-  const modelSelect = document.getElementById('model');
-  const display = document.getElementById('activeModelDisplay');
-  if (!modelSelect || !display) return;
-  
-  const selectedOption = modelSelect.options[modelSelect.selectedIndex];
-  display.textContent = (selectedOption && selectedOption.value) ? selectedOption.text.split(' ')[0] : 'No model';
-}
-
-function updateActiveProviderDisplay() {
-  const providerSelect = document.getElementById('provider');
-  const display = document.getElementById('activeProviderDisplay');
-  if (!providerSelect || !display) return;
-  
-  const selectedOption = providerSelect.options[providerSelect.selectedIndex];
-  display.textContent = (selectedOption && selectedOption.value) ? selectedOption.text.split(' ')[0] : 'No provider';
-}
-
-function updateProviderStatusCard() {
-  const provider = providerManager.getCurrentProvider();
-  const card = document.getElementById('providerStatusCard');
-  if (!card) return;
-  
-  if (!provider) {
-    card.style.display = 'none';
-    return;
-  }
-  
-  card.style.display = 'block';
-  document.getElementById('providerStatusIcon').textContent = provider.icon || '🔑';
-  document.getElementById('providerStatusName').textContent = provider.name;
-  
-  const statusDot = document.getElementById('providerStatusDot');
-  const statusText = document.getElementById('providerStatusText');
-  
-  if (provider.keys && provider.keys.length > 0) {
-    statusDot.className = 'status-dot connected';
-    statusText.textContent = 'Connected';
-  } else {
-    statusDot.className = 'status-dot disconnected';
-    statusText.textContent = 'No Key';
-  }
-  
-  document.getElementById('providerKeyCount').textContent = `${provider.keys?.length || 0} keys`;
-  document.getElementById('providerModelCount').textContent = `${provider.models_cache?.length || 0} models`;
 }
 
 // ============ Enhanced Toast ============
@@ -923,7 +871,7 @@ function showImagePreview(imageData) { const container = document.getElementById
 
 function initEventListeners() {
   document.getElementById('provider').addEventListener('change', () => { loadModels(); providerManager.loadActiveKeyToField(); });
-  document.getElementById('model').addEventListener('change', (e) => { ui.updateModelInfo(e.target.value); updateActiveModelDisplay(); });
+  document.getElementById('model').addEventListener('change', (e) => { ui.updateModelInfo(e.target.value); });
   document.getElementById('sendBtn').addEventListener('click', () => chat.sendMessage());
   
   const prompt = document.getElementById('prompt');
