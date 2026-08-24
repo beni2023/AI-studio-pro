@@ -25,14 +25,14 @@ jobs:
           echo "در حال بیلد کردن پروژه..."
           mkdir -p build_output
           # استفاده از run_number برای ساخت نام یکتا
-          echo "این یک فایل خروجی کامپایل شده است." > build_output/my-app-${{ github.run_number }}.zip
+          echo "این یک فایل خروجی کامپایل شده است." > build_output/AI Studio Pro-${{ github.run_number }}.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           # ساخت تگ بر اساس شماره اجرای گیت‌هاب
           tag_name: v-auto-${{ github.run_number }}
-          name: Auto Release #${{ github.run_number }}
+          name: AI Studio Pro #${{ github.run_number }}
           generate_release_notes: true
           files: |
             build_output/*
