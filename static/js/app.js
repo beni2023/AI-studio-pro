@@ -557,63 +557,6 @@ const chat = {
 // ============ Models ============
 
 // Model categories mapping
-const modelCategories = {
-  'coding': ['code', 'coder', 'programming', 'dev', 'developer', 'python', 'javascript', 'html', 'css'],
-  'vision': ['vision', 'image', 'picture', 'photo', 'sight', 'see', 'visual', 'claude-3', 'gpt-4-vision', 'gemini-pro-vision'],
-  'chat': ['chat', 'conversation', 'talk', 'dialogue', 'assistant', 'help', 'general', 'turbo', 'flash'],
-  'analysis': ['analysis', 'analyze', 'data', 'research', 'study', 'examine', 'review', 'insight', 'reason']
-};
-
-let currentCategoryFilter = 'all';
-let allModelsCache = [];
-
-function getModelCategory(modelName) {
-  const nameLower = modelName.toLowerCase();
-  
-  // Check for vision models first (highest priority)
-  if (modelCategories.vision.some(keyword => nameLower.includes(keyword))) {
-    return 'vision';
-  }
-  
-  // Check for coding models
-  if (modelCategories.coding.some(keyword => nameLower.includes(keyword))) {
-    return 'coding';
-  }
-  
-  // Check for analysis models
-  if (modelCategories.analysis.some(keyword => nameLower.includes(keyword))) {
-    return 'analysis';
-  }
-  
-  // Default to chat for general models
-  return 'chat';
-}
-
-function filterModelsByCategory(models, category) {
-  if (category === 'all') {
-    return models;
-  }
-  
-  return models.filter(model => {
-    const modelCategory = getModelCategory(model.name || model.id);
-    return modelCategory === category;
-  });
-}
-
-function getRecommendedModel(models, category) {
-  const filtered = filterModelsByCategory(models, category);
-  if (filtered.length === 0) return null;
-  
-  // Prefer free models and models with specific keywords
-  const preferred = filtered.find(m => 
-    m.is_free || 
-    (m.name && m.name.toLowerCase().includes('plus')) ||
-    (m.name && m.name.toLowerCase().includes('pro'))
-  );
-  
-  return preferred || filtered[0];
-}
-
 async function loadModels() {
   const provider = providerManager.getCurrentProvider();
   if (!provider) return;
@@ -625,15 +568,13 @@ async function loadModels() {
   try {
     const data = await api.getModels(provider.id);
     const models = data.models || [];
-    allModelsCache = models;
     
     if (models.length > 0) {
-      renderModelsWithFilter(models);
+      renderModels(models);
       state.modelsLoaded = true;
       ui.updateModelInfo(sel.value);
       updateActiveModelDisplay();
       updateProviderStatusCard();
-      updateModelRecommendation();
     } else {
       sel.innerHTML = '<option value="" disabled>⚠️ No models - Add API key first</option>';
       ui.showToast('No models available', 'warning');
@@ -646,47 +587,21 @@ async function loadModels() {
   }
 }
 
-function renderModelsWithFilter(models, category = currentCategoryFilter) {
+function renderModels(models) {
   const sel = document.getElementById('model');
-  const filteredModels = filterModelsByCategory(models, category);
   
-  if (filteredModels.length === 0) {
-    sel.innerHTML = '<option value="" disabled>No models in this category</option>';
+  if (models.length === 0) {
+    sel.innerHTML = '<option value="" disabled>No models available</option>';
     return;
   }
   
-  sel.innerHTML = filteredModels.map(m => {
-    const badge = m.is_free ? '<span class="model-free-badge">FREE</span>' : '<span class="model-paid-badge">PAID</span>';
-    const modelCategory = getModelCategory(m.name || m.id);
-    const categoryIcon = modelCategory === 'coding' ? '💻' : 
-                         modelCategory === 'vision' ? '👁️' : 
-                         modelCategory === 'analysis' ? '📊' : '💬';
-    return `<option value="${utils.escapeHtml(m.id)}">${categoryIcon} ${utils.escapeHtml(m.name)} ${badge}</option>`;
+  sel.innerHTML = models.map(m => {
+    return `<option value="${utils.escapeHtml(m.id)}">${utils.escapeHtml(m.name)}</option>`;
   }).join('');
   
   // Select first model if none selected
-  if (!sel.value && filteredModels.length > 0) {
+  if (!sel.value && models.length > 0) {
     sel.selectedIndex = 0;
-  }
-}
-
-function updateModelRecommendation() {
-  const recDiv = document.getElementById('modelRecommendation');
-  const recText = recDiv.querySelector('.recommendation-text');
-  const models = allModelsCache;
-  
-  if (models.length === 0 || currentCategoryFilter === 'all') {
-    recDiv.hidden = true;
-    return;
-  }
-  
-  const recommended = getRecommendedModel(models, currentCategoryFilter);
-  if (recommended) {
-    const categoryName = currentCategoryFilter.charAt(0).toUpperCase() + currentCategoryFilter.slice(1);
-    recText.textContent = `Best for ${categoryName}: ${recommended.name}`;
-    recDiv.hidden = false;
-  } else {
-    recDiv.hidden = true;
   }
 }
 
@@ -706,15 +621,13 @@ async function forceRefreshModels() {
   try {
     const data = await api.getModels(provider.id, true);
     const models = data.models || [];
-    allModelsCache = models;
     
     if (models.length > 0) {
-      renderModelsWithFilter(models);
+      renderModels(models);
       state.modelsLoaded = true;
       ui.updateModelInfo(sel.value);
       updateActiveModelDisplay();
       updateProviderStatusCard();
-      updateModelRecommendation();
       ui.showToast(`Loaded ${models.length} models`, 'success');
     } else {
       sel.innerHTML = '<option value="" disabled>⚠️ No models available</option>';
@@ -1050,26 +963,6 @@ function initEventListeners() {
   
   const refreshModelsBtn = document.getElementById('refreshModelsBtn');
   if (refreshModelsBtn) refreshModelsBtn.addEventListener('click', forceRefreshModels);
-  
-  // Model category filter
-  const categoryFilter = document.getElementById('modelCategoryFilter');
-  if (categoryFilter) {
-    categoryFilter.addEventListener('click', (e) => {
-      const btn = e.target.closest('.category-btn');
-      if (!btn) return;
-      
-      // Update active state
-      categoryFilter.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      
-      // Update current category
-      currentCategoryFilter = btn.dataset.category;
-      
-      // Re-render models with filter
-      renderModelsWithFilter(allModelsCache);
-      updateModelRecommendation();
-    });
-  }
 }
 
 // توابع حذف شده - Key Manager کاملاً حذف شد
