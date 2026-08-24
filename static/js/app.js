@@ -582,6 +582,92 @@ async function loadModels() {
   }
 }
 
+// Health check for models to detect expired/unavailable models
+async function checkModelHealth(modelId) {
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey || !modelId) return 'unknown';
+
+  try {
+    // Send lightweight test request to OpenRouter
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.href,
+        'X-Title': 'AI Chat App'
+      },
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: 'user', content: '.' }], // Empty message for testing
+        max_tokens: 1 // Minimum cost
+      })
+    });
+
+    if (response.ok) return 'healthy';
+    if (response.status === 410) return 'gone'; // Model expired
+    if (response.status === 404) return 'not_found'; // Model not found
+    return 'warning'; // Other errors
+    
+  } catch (error) {
+    console.warn(`Health check failed for ${modelId}:`, error);
+    return 'error';
+  }
+}
+
+function getModelStatusDot(status) {
+  switch(status) {
+    case 'healthy': return '🟢';
+    case 'checking': return '🟡';
+    case 'gone': 
+    case 'not_found': return '🔴';
+    case 'warning': 
+    case 'error': return '🟠';
+    default: return '⚪';
+  }
+}
+
+async function selectModel(modelId, modelName) {
+  currentModel = modelId;
+  
+  // 1. Change status to "checking" (yellow)
+  updateModelStatusInList(modelId, 'checking');
+  
+  // Save to settings
+  localStorage.setItem('selectedModel', modelId);
+  
+  // Update selector UI
+  const modelSelect = document.getElementById('model');
+  if (modelSelect.value !== modelId) {
+    modelSelect.value = modelId;
+  }
+
+  // 2. Perform health check in background
+  const healthStatus = await checkModelHealth(modelId);
+  
+  // 3. Update final status based on result
+  updateModelStatusInList(modelId, healthStatus);
+
+  if (healthStatus === 'gone' || healthStatus === 'not_found') {
+    ui.showToast(`مدل "${modelName}" دیگر در دسترس نیست`, 'error');
+  } else if (healthStatus !== 'healthy') {
+    ui.showToast(`وضعیت مدل "${modelName}" نامشخص است`, 'warning');
+  }
+}
+
+function updateModelStatusInList(modelId, status) {
+  const modelSelect = document.getElementById('model');
+  for (let i = 0; i < modelSelect.options.length; i++) {
+    if (modelSelect.options[i].value === modelId) {
+      const dot = getModelStatusDot(status);
+      const currentText = modelSelect.options[i].text.replace(/^[🟢🔴🟡🟠⚪]\s*/, '');
+      modelSelect.options[i].text = `${dot} ${currentText}`;
+      modelSelect.options[i].setAttribute('data-status', status);
+      break;
+    }
+  }
+}
+
 function renderModels(models) {
   const sel = document.getElementById('model');
   
@@ -592,7 +678,6 @@ function renderModels(models) {
   
   sel.innerHTML = models.map(m => {
     const isActive = m.status === 'active' || !m.status;
-    const statusClass = isActive ? 'status-active' : 'status-inactive';
     const statusDot = isActive ? '🟢' : '🔴';
     return `<option value="${utils.escapeHtml(m.id)}" data-status="${isActive ? 'active' : 'inactive'}">${statusDot} ${utils.escapeHtml(m.name)}</option>`;
   }).join('');
@@ -871,7 +956,13 @@ function showImagePreview(imageData) { const container = document.getElementById
 
 function initEventListeners() {
   document.getElementById('provider').addEventListener('change', () => { loadModels(); providerManager.loadActiveKeyToField(); });
-  document.getElementById('model').addEventListener('change', (e) => { ui.updateModelInfo(e.target.value); });
+  document.getElementById('model').addEventListener('change', (e) => { 
+    const modelId = e.target.value;
+    const modelName = e.target.options[e.target.selectedIndex]?.text.replace(/^[🟢🔴🟡🟠⚪]\s*/, '') || modelId;
+    ui.updateModelInfo(modelName);
+    // Trigger health check when user manually selects a model from dropdown
+    if (modelId) selectModel(modelId, modelName);
+  });
   document.getElementById('sendBtn').addEventListener('click', () => chat.sendMessage());
   
   const prompt = document.getElementById('prompt');
