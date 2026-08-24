@@ -1,0 +1,40 @@
+name: Automated Release (Auto on Merge)
+
+# این اتوماسیون هر بار که کدی روی شاخه main مرج شود اجرا می‌شود
+on:
+  push:
+    branches:
+      - main  # اگر شاخه اصلی شما master است، کلمه main را به master تغییر دهید
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build Project (Dummy Build)
+        run: |
+          echo "در حال بیلد کردن پروژه..."
+          mkdir -p build_output
+          # استفاده از run_number برای ساخت نام یکتا
+          echo "این یک فایل خروجی کامپایل شده است." > build_output/my-app-${{ github.run_number }}.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # ساخت تگ بر اساس شماره اجرای گیت‌هاب
+          tag_name: v-auto-${{ github.run_number }}
+          name: Auto Release #${{ github.run_number }}
+          generate_release_notes: true
+          files: |
+            build_output/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
