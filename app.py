@@ -159,7 +159,72 @@ def health():
                 "message": "No active API key"
             }
     
-    return jresponse(results)
+    return jsonify(results)
+
+
+@app.route("/api/health/check", methods=["POST"])
+@handle_api_errors
+def check_model_health():
+    """بررسی سلامت یک مدل خاص با استفاده از درخواست تست سبک"""
+    data = request.get_json() or {}
+    model_id = data.get("model")
+    api_key = data.get("api_key")
+    provider_id = data.get("provider_id")
+    
+    if not model_id:
+        return jsonify({"error": "Model ID is required"}), 400
+    
+    if not api_key:
+        return jsonify({"error": "API key is required"}), 400
+    
+    # Try to find the provider adapter
+    adapter = None
+    if provider_id and provider_id in providers_cache:
+        adapter = providers_cache[provider_id]
+    else:
+        # Default to OpenRouter adapter if no provider specified
+        # Try to find a provider that uses openrouter
+        for pid, p_adapter in providers_cache.items():
+            if 'openrouter' in pid.lower() or 'openrouter' in p_adapter.base_url.lower():
+                adapter = p_adapter
+                break
+    
+    if not adapter:
+        # Create a temporary OpenRouter-style adapter
+        from services.router import RouterAdapter
+        adapter = RouterAdapter(
+            provider_id="temp_openrouter",
+            name="OpenRouter",
+            base_url="https://openrouter.ai/api/v1",
+            protocol="chat_completions",
+            models_endpoint="/models",
+            chat_endpoint="/chat/completions"
+        )
+    
+    # Perform lightweight health check
+    try:
+        test_result = adapter.test_model_health(model_id, api_key)
+        
+        if test_result.get("success"):
+            return jsonify({"status": "healthy", "message": "Model is available"})
+        else:
+            error_message = test_result.get("message", "")
+            status_code = test_result.get("status_code", 500)
+            
+            # Map error messages to specific statuses
+            if "410" in error_message or "gone" in error_message.lower():
+                return jsonify({"status": "gone", "message": "Model has been deprecated"}), 410
+            elif "404" in error_message or "not found" in error_message.lower():
+                return jsonify({"status": "not_found", "message": "Model not found"}), 404
+            elif "401" in error_message or "unauthorized" in error_message.lower():
+                return jsonify({"status": "auth_error", "message": "Invalid API key"}), 401
+            elif status_code >= 500:
+                return jsonify({"status": "server_error", "message": "Server error"}), status_code
+            else:
+                return jsonify({"status": "warning", "message": error_message}), 400
+                
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 # ============ Provider Endpoints ============

@@ -670,30 +670,12 @@ function renderModels(models) {
     return;
   }
   
-  // Load cached health statuses
-  const cachedStatuses = new Map();
-  models.forEach(m => {
-    const cached = ModelHealthChecker.getCachedHealth(m.id);
-    if (cached) cachedStatuses.set(m.id, cached);
-  });
-  
+  // همه مدل‌ها در ابتدا خاکستری (unknown) هستند تا زمانی که بررسی شوند
   sel.innerHTML = models.map(m => {
     const isActive = m.status === 'active' || !m.status;
-    const cachedStatus = cachedStatuses.get(m.id);
-    let statusDot = '⚪';
-    let finalStatus = 'unknown';
-    
-    if (cachedStatus) {
-      // Use cached status
-      statusDot = getModelStatusDot(cachedStatus);
-      finalStatus = cachedStatus;
-    } else if (isActive) {
-      statusDot = '🟢';
-      finalStatus = 'healthy';
-    } else {
-      statusDot = '🔴';
-      finalStatus = 'inactive';
-    }
+    // همیشه با چراغ خاکستری شروع می‌شود
+    const statusDot = '⚪';
+    const finalStatus = 'unknown';
     
     return `<option value="${utils.escapeHtml(m.id)}" data-status="${finalStatus}">${statusDot} ${utils.escapeHtml(m.name)}</option>`;
   }).join('');
@@ -872,6 +854,7 @@ const ModelHealthChecker = {
   queue: [],
   isProcessing: false,
   currentAbortController: null,
+  HEALTH_TIMEOUT: 30000, // 30 seconds timeout
   
   // Check if cached result is still valid
   getCachedHealth(modelId) {
@@ -886,35 +869,69 @@ const ModelHealthChecker = {
     return cached.status;
   },
   
-  // Cache health status
+  // Cache health status in memory and localStorage
   cacheHealth(modelId, status) {
     this.cache.set(modelId, {
       status: status,
       timestamp: Date.now()
     });
+    
+    // Also save to localStorage for persistence
+    try {
+      const storageKey = `model_health_${modelId}`;
+      localStorage.setItem(storageKey, JSON.stringify({
+        status: status,
+        timestamp: Date.now()
+      }));
+    } catch (e) {
+      console.warn('Failed to save to localStorage:', e);
+    }
+  },
+  
+  // Get cached health from localStorage
+  getLocalStorageHealth(modelId) {
+    try {
+      const storageKey = `model_health_${modelId}`;
+      const data = localStorage.getItem(storageKey);
+      if (!data) return null;
+      
+      const parsed = JSON.parse(data);
+      const now = Date.now();
+      if (now - parsed.timestamp > this.CACHE_DURATION) {
+        localStorage.removeItem(storageKey);
+        return null;
+      }
+      return parsed.status;
+    } catch (e) {
+      return null;
+    }
   },
   
   // Add to queue and process
-  async checkHealth(modelId, modelName) {
+  async checkHealth(modelId, modelName, providerId = null) {
     // Cancel previous pending checks
     if (this.currentAbortController) {
       this.currentAbortController.abort();
     }
     
     // Clear queue and add only the latest request
-    this.queue = [{ modelId, modelName }];
+    this.queue = [{ modelId, modelName, providerId }];
     
     return await this.processQueue();
   },
   
   async processQueue() {
-    if (this.isProcessing || this.queue.length === 0) return;
+    if (this.isProcessing || this.queue.length === 0) return 'unknown';
     
     this.isProcessing = true;
-    const { modelId, modelName } = this.queue.shift();
+    const { modelId, modelName, providerId } = this.queue.shift();
     
-    // Check cache first
-    const cachedStatus = this.getCachedHealth(modelId);
+    // Check cache first (memory and localStorage)
+    let cachedStatus = this.getCachedHealth(modelId);
+    if (!cachedStatus) {
+      cachedStatus = this.getLocalStorageHealth(modelId);
+    }
+    
     if (cachedStatus) {
       console.log(`📦 Using cached health status for ${modelId}: ${cachedStatus}`);
       updateModelStatusInList(modelId, cachedStatus);
@@ -922,14 +939,23 @@ const ModelHealthChecker = {
       return cachedStatus;
     }
     
-    // Show "checking" toast
+    // Show "checking" toast with loading indicator
     showToastEnhanced(`در حال بررسی وضعیت مدل "${modelName}"...`, 'checking', 0);
     
     // Create new abort controller for this request
     this.currentAbortController = new AbortController();
     
+    // Set up timeout
+    const timeoutId = setTimeout(() => {
+      if (this.currentAbortController) {
+        this.currentAbortController.abort();
+      }
+    }, this.HEALTH_TIMEOUT);
+    
     try {
-      const healthStatus = await this.performHealthCheck(modelId, this.currentAbortController.signal);
+      const healthStatus = await this.performHealthCheck(modelId, this.currentAbortController.signal, providerId);
+      
+      clearTimeout(timeoutId);
       
       // Cache the result
       this.cacheHealth(modelId, healthStatus);
@@ -952,10 +978,22 @@ const ModelHealthChecker = {
       return healthStatus;
       
     } catch (error) {
+      clearTimeout(timeoutId);
+      
       if (error.name === 'AbortError') {
-        console.log('Health check aborted');
+        console.log('Health check aborted or timed out');
+        updateModelStatusInList(modelId, 'timeout');
+        
+        const checkingToast = state.activeToasts.find(t => t.classList.contains('checking'));
+        if (checkingToast) {
+          checkingToast.remove();
+          const idx = state.activeToasts.indexOf(checkingToast);
+          if (idx > -1) state.activeToasts.splice(idx, 1);
+        }
+        
+        showToastEnhanced(`زمان بررسی مدل "${modelName}" به پایان رسید (۳۰ ثانیه)`, 'error', 5000);
         this.isProcessing = false;
-        return 'aborted';
+        return 'timeout';
       }
       
       console.error('Health check failed:', error);
@@ -974,38 +1012,105 @@ const ModelHealthChecker = {
     }
   },
   
-  async performHealthCheck(modelId, signal) {
-    const apiKey = document.getElementById('api-key').value.trim();
-    if (!apiKey || !modelId) return 'unknown';
+  async performHealthCheck(modelId, signal, providerId = null) {
+    if (!modelId) return 'unknown';
+    
+    // Try to get API key from multiple sources
+    let apiKey = '';
+    
+    // Source 1: Hidden input field (if exists)
+    const apiKeyInput = document.getElementById('api-key');
+    if (apiKeyInput) {
+      apiKey = apiKeyInput.value.trim();
+    }
+    
+    // Source 2: Provider manager's active key
+    if (!apiKey && providerManager && providerManager.getCurrentProvider) {
+      const provider = providerManager.getCurrentProvider();
+      if (provider && provider.keys && provider.keys.length > 0) {
+        const activeKey = provider.keys.find(k => k.is_default && k.enabled) || 
+                         provider.keys.find(k => k.enabled) || 
+                         provider.keys[0];
+        if (activeKey && activeKey.api_key) {
+          apiKey = activeKey.api_key;
+        }
+      }
+    }
+    
+    // Source 3: From localStorage
+    if (!apiKey) {
+      const storedKey = localStorage.getItem('last_api_key');
+      if (storedKey) {
+        apiKey = storedKey;
+      }
+    }
+    
+    if (!apiKey) {
+      console.warn('No API key found for health check');
+      return 'no_key'; // Special status for missing key
+    }
     
     try {
-      // Send lightweight test request
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      // Use backend endpoint for health check instead of direct API call
+      const response = await fetch('/api/health/check', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.href,
-          'X-Title': 'AI Chat App'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           model: modelId,
-          messages: [{ role: 'user', content: '.' }], // Empty message for testing
-          max_tokens: 1 // Minimum cost
+          api_key: apiKey,
+          provider_id: providerId
         }),
         signal
       });
       
-      if (response.ok) return 'healthy';
+      if (response.ok) {
+        const data = await response.json();
+        return data.status || 'healthy';
+      }
+      
       if (response.status === 410) return 'gone'; // Model expired/deprecated
       if (response.status === 404) return 'not_found'; // Model not found
+      if (response.status === 401) return 'auth_error'; // Authentication error
       if (response.status >= 500) return 'server_error'; // Server error
       return 'warning'; // Other errors
       
     } catch (error) {
       if (error.name === 'AbortError') throw error;
-      console.warn(`Health check failed for ${modelId}:`, error);
-      return 'error';
+      
+      // Fallback: Try direct OpenRouter API call
+      console.warn('Backend health check failed, trying direct API call:', error);
+      
+      try {
+        const directResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.href,
+            'X-Title': 'AI Chat App'
+          },
+          body: JSON.stringify({
+            model: modelId,
+            messages: [{ role: 'user', content: '.' }], // Empty message for testing
+            max_tokens: 1 // Minimum cost
+          }),
+          signal
+        });
+        
+        if (directResponse.ok) return 'healthy';
+        if (directResponse.status === 410) return 'gone';
+        if (directResponse.status === 404) return 'not_found';
+        if (directResponse.status === 401) return 'auth_error';
+        if (directResponse.status >= 500) return 'server_error';
+        return 'warning';
+        
+      } catch (fallbackError) {
+        if (fallbackError.name === 'AbortError') throw fallbackError;
+        console.warn(`Direct health check also failed for ${modelId}:`, fallbackError);
+        return 'error';
+      }
     }
   },
   
@@ -1022,6 +1127,15 @@ const ModelHealthChecker = {
         break;
       case 'server_error':
         showToastEnhanced(`خطای سرور در بررسی مدل "${modelName}"`, 'error', 5000);
+        break;
+      case 'auth_error':
+        showToastEnhanced(`خطای احراز هویت - کلید API نامعتبر است`, 'error', 8000);
+        break;
+      case 'no_key':
+        showToastEnhanced(`کلید API برای بررسی مدل یافت نشد`, 'warning', 5000);
+        break;
+      case 'timeout':
+        showToastEnhanced(`بررسی مدل "${modelName}" بیش از حد طول کشید`, 'error', 5000);
         break;
       case 'warning':
         showToastEnhanced(`وضعیت مدل "${modelName}" نامشخص است`, 'warning', 5000);

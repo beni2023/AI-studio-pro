@@ -271,6 +271,43 @@ class NineRouterAdapter:
         
         except Exception as e:
             return {'success': False, 'message': f'❌ {str(e)}'}
+    
+    def test_model_health(self, model_id: str, api_key: str = None) -> Dict:
+        """بررسی سلامت یک مدل خاص با درخواست تست سبک"""
+        try:
+            url = f"{self.base_url}/v1/chat/completions"
+            headers = self._get_headers()
+            timeout = 15  # Timeout برای تست مدل
+            
+            # ارسال درخواست تست بسیار سبک
+            payload = {
+                'model': model_id,
+                'messages': [{'role': 'user', 'content': '.'}],  # پیام خالی برای تست
+                'max_tokens': 1,  # حداقل هزینه
+                'stream': False
+            }
+            
+            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            
+            if resp.status_code == 200:
+                return {'success': True, 'message': 'Model is healthy', 'status_code': 200}
+            elif resp.status_code == 410:
+                return {'success': False, 'message': 'Model has been deprecated (410 Gone)', 'status_code': 410}
+            elif resp.status_code == 404:
+                return {'success': False, 'message': 'Model not found (404)', 'status_code': 404}
+            elif resp.status_code == 401:
+                return {'success': False, 'message': 'Unauthorized (401)', 'status_code': 401}
+            elif resp.status_code >= 500:
+                return {'success': False, 'message': f'Server error ({resp.status_code})', 'status_code': resp.status_code}
+            else:
+                return {'success': False, 'message': f'HTTP {resp.status_code}: {resp.text[:200]}', 'status_code': resp.status_code}
+        
+        except requests.exceptions.Timeout:
+            return {'success': False, 'message': 'Request timeout', 'status_code': 408}
+        except requests.exceptions.ConnectionError as e:
+            return {'success': False, 'message': f'Connection error: {str(e)}', 'status_code': 0}
+        except Exception as e:
+            return {'success': False, 'message': f'Error: {str(e)}', 'status_code': 0}
 
 
 # ============ Provider Factory ============

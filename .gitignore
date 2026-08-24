@@ -1,8 +1,61 @@
 ```
-# Build artifacts
-static/css/components.css
-static/js/app.js
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.env
+.env.*
+.env.local
+.env.dev
+.env.test
+.env.prod
+.python-version
+.python-history
+.python-venv
 
-# Original rules preserved
-.gitignore
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing
+.coverage
+coverage/
+htmlcov/
+.nyc_output/
+coverage-final.json
+.pytest_cache/
+.hypothesis/
+
+# Logs
+*.log
+logs/
+*.out
+*.pid
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Thumbs.db:encryptable
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 ```
