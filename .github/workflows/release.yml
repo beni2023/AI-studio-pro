@@ -25,7 +25,7 @@ jobs:
           echo "در حال بیلد کردن پروژه..."
           mkdir -p build_output
           # استفاده از run_number برای ساخت نام یکتا
-          echo "این یک فایل خروجی کامپایل شده است." > build_output/AI Studio Pro-${{ github.run_number }}.zip
+          echo "این یک فایل خروجی کامپایل شده است." > build_output/AI-Studio-Pro-${{ github.run_number }}.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
