@@ -1,3 +1,8 @@
-The modified files (`static/css/components.css` and `static/js/app.js`) are source code files that should not be ignored. Since there are no build artifacts, dependency directories, temporary files, or other ignorable items in the changes, no additions to the .gitignore file are needed.
+```
+# Build artifacts
+static/css/components.css
+static/js/app.js
 
-No .gitignore content should be added.
+# Original rules preserved
+.gitignore
+```
